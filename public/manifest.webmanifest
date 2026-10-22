@@ -1,6 +1,7 @@
 {
   "name": "FX Watch",
   "short_name": "FX Watch",
+  "id": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f6f6f2",

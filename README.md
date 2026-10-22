@@ -1,12 +1,29 @@
 # FX Watch
 
-GBP→CNY and USD→CNY rates on iPhone and Mac, with a Telegram alert when a rate drops below a floor you set.
+A small web app for buying GBP and USD through China CITIC Bank. It shows CITIC's customer buy price and sends a Telegram message when a price drops below a floor you set.
 
-One Cloudflare Worker does everything:
+Live at **[fx.etarc.net](https://fx.etarc.net)**. Works on iPhone and Mac as a home-screen / Dock app.
 
-- serves the web app from `public/`
-- `/api/*` fetches live rates from Yahoo Finance and stores your floors in KV
-- a cron trigger checks both rates every 10 minutes and sends a Telegram message on a drop below the floor (once per drop; it re-arms when the rate climbs back above)
+## What it does
+
+- Shows the CITIC customer buy price (客户购汇价) for GBP→CNY and USD→CNY, refreshed every 30 seconds while open
+- Checks both prices every 10 minutes and sends one Telegram alert when a price drops below its floor; it re-arms once the price climbs back above
+- Records every check, since CITIC publishes no history, and charts the recorded prices
+- Floors are edited in the app, protected by a password
+
+Prices come from the feed behind the public rate table on citicbank.com. They are for reference only; the price in the CITIC app when you trade is final.
+
+## How it works
+
+One Cloudflare Worker:
+
+| Part | Where |
+|---|---|
+| Web app | `public/` |
+| API (`/api/rates`, `/api/history`, `/api/settings`, `/api/test`) | `src/worker.js` |
+| Parsing, alert rules, messages | `src/logic.js` |
+| Floors, alert state, recorded prices | Workers KV (`STORE`) |
+| 10-minute check | Cron trigger in `wrangler.jsonc` |
 
 ## Develop
 
@@ -18,9 +35,9 @@ npm test
 
 ## Deploy
 
-Pushing to `main` deploys through Cloudflare Workers Builds.
+Pushing to `main` deploys through Cloudflare Workers Builds. The Worker name must stay `fx-watch`.
 
-Secrets (Cloudflare dashboard → Worker → Settings → Variables and Secrets):
+Secrets (Cloudflare dashboard → fx-watch → Settings → Variables and Secrets):
 
 | Name | What |
 |---|---|
@@ -32,5 +49,3 @@ Secrets (Cloudflare dashboard → Worker → Settings → Variables and Secrets)
 
 - **iPhone:** open the site in Safari → Share → Add to Home Screen
 - **Mac:** open the site in Safari → File → Add to Dock
-
-Rates are market mid rates; your bank's rate will differ.

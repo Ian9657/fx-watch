@@ -1,6 +1,4 @@
-__pycache__/
-*.pyc
-.env
-.env.*
-monitor-state.json
 .DS_Store
+.wrangler/
+.dev.vars
+node_modules/

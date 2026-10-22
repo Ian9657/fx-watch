@@ -1,0 +1,9 @@
+{
+  "name": "fx-watch",
+  "compatibility_date": "2026-09-28",
+  "main": "src/worker.js",
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+  "triggers": { "crons": ["*/10 * * * *"] },
+  "kv_namespaces": [{ "binding": "STORE" }],
+  "observability": { "enabled": true }
+}

@@ -1,7 +1,6 @@
 // Pure helpers shared by the worker and tests. No I/O here.
 
 export const PAIRS = ['GBP', 'USD'];
-export const RANGES = { '1d': 1, '5d': 5, '1mo': 31, '3mo': 92, '1y': 366 };
 
 // CITIC Bank currency codes in its rate feed.
 const CITIC_CODES = { GBP: '012001', USD: '014001' };

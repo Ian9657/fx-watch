@@ -25,50 +25,35 @@
     <p id="error" class="error" hidden></p>
 
     <section class="cards">
-      <button class="card" data-pair="GBP" aria-pressed="true">
+      <article class="card" data-pair="GBP">
         <span class="pair">GBP · CITIC buy</span>
         <span class="rate" id="rate-GBP">—</span>
         <span class="change" id="change-GBP"></span>
         <span class="quoted" id="quoted-GBP"></span>
         <span class="floor" id="floor-GBP"></span>
-      </button>
-      <button class="card" data-pair="USD" aria-pressed="false">
+      </article>
+      <article class="card" data-pair="USD">
         <span class="pair">USD · CITIC buy</span>
         <span class="rate" id="rate-USD">—</span>
         <span class="change" id="change-USD"></span>
         <span class="quoted" id="quoted-USD"></span>
         <span class="floor" id="floor-USD"></span>
-      </button>
-    </section>
-
-    <section class="panel">
-      <div class="ranges" role="group" aria-label="Chart range">
-        <button data-range="1d" aria-pressed="true">1D</button>
-        <button data-range="5d" aria-pressed="false">5D</button>
-        <button data-range="1mo" aria-pressed="false">1M</button>
-        <button data-range="3mo" aria-pressed="false">3M</button>
-        <button data-range="1y" aria-pressed="false">1Y</button>
-      </div>
-      <div id="chart" class="chart"></div>
-      <p id="chart-note" class="muted small"></p>
+      </article>
     </section>
 
     <section class="panel">
       <h2>Alerts</h2>
-      <p class="muted">Telegram message when the CITIC buy price drops below your floor. Leave empty to turn off. "Test Telegram" just checks that messages reach you.</p>
+      <p class="muted">Telegram message when a price drops below its floor. Leave empty to turn off.</p>
       <form id="floors">
         <label>GBP floor <input id="input-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off"></label>
         <label>USD floor <input id="input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off"></label>
         <label id="password-row" hidden>Password <input id="password" type="password" autocomplete="current-password"></label>
-        <div class="actions">
-          <button type="submit">Save</button>
-          <button type="button" id="test" class="secondary">Test Telegram</button>
-        </div>
-        <p id="form-status" class="muted" role="status"></p>
+        <button type="submit" class="save">Save</button>
+        <p class="muted small"><span id="form-status" role="status"></span> <button type="button" id="test" class="link">Send a test message</button></p>
       </form>
     </section>
 
-    <footer class="muted">Customer buy price from China CITIC Bank's public rate table. For reference only; the price in the CITIC app when you trade is final.</footer>
+    <footer class="muted">CITIC Bank customer buy price, for reference. The price in the CITIC app is final.</footer>
   </main>
 </body>
 </html>

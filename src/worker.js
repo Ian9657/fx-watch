@@ -1,4 +1,4 @@
-import { PAIRS, RANGES, parseCitic, beijingDay, validFloor, evaluate, alertMessage, testMessage } from './logic.js';
+import { PAIRS, parseCitic, beijingDay, validFloor, evaluate, alertMessage, testMessage } from './logic.js';
 
 const EMPTY = { floors: { GBP: null, USD: null }, alerted: { GBP: false, USD: false }, lastCheck: null };
 
@@ -10,8 +10,6 @@ async function save(env, data) {
   await env.STORE.put('data', JSON.stringify(data));
 }
 
-const DAY = 86400 * 1000;
-
 // The same feed that powers the rate table on citicbank.com.
 async function fetchCitic() {
   const res = await fetch('https://etrade.citicbank.com/portalweb/cms/getForeignExchRate.htm?callback=cb', {
@@ -21,40 +19,15 @@ async function fetchCitic() {
   return parseCitic(await res.text());
 }
 
-// CITIC has no public history, so every check is recorded:
-// `day:YYYY-MM-DD` holds that day's samples, `daily` the last sample of each day.
+// Keep the last price of each Beijing day, for the change vs. yesterday.
 async function record(env, quotes) {
   const t = Math.max(...PAIRS.map(p => quotes[p].time));
-  const sample = { t, ...Object.fromEntries(PAIRS.map(p => [p, quotes[p].price])) };
   const day = beijingDay(t * 1000);
-
-  const samples = (await env.STORE.get(`day:${day}`, 'json')) || [];
-  if (samples.at(-1)?.t === t) return;
-  samples.push(sample);
-  const daily = ((await env.STORE.get('daily', 'json')) || []).filter(d => d.d !== day);
-  daily.push({ d: day, ...sample });
-  await Promise.all([
-    env.STORE.put(`day:${day}`, JSON.stringify(samples), { expirationTtl: 8 * 86400 }),
-    env.STORE.put('daily', JSON.stringify(daily.slice(-400))),
-  ]);
-}
-
-async function history(env, pair, range) {
-  const now = Date.now();
-  const days = RANGES[range];
   const daily = (await env.STORE.get('daily', 'json')) || [];
-  const since = daily[0]?.d ?? null;
-  let rows;
-  if (days <= 5) {
-    // Intraday samples, one KV key per Beijing day.
-    const keys = Array.from({ length: days + 1 }, (_, i) => `day:${beijingDay(now - (days - i) * DAY)}`);
-    rows = (await Promise.all(keys.map(k => env.STORE.get(k, 'json')))).flatMap(r => r || []);
-    rows = rows.filter(r => r.t * 1000 >= now - days * DAY);
-  } else {
-    const cutoff = beijingDay(now - days * DAY);
-    rows = daily.filter(r => r.d >= cutoff);
-  }
-  return { since, points: rows.map(r => ({ t: r.t, rate: r[pair] })) };
+  if (daily.at(-1)?.t === t) return;
+  const next = daily.filter(d => d.d !== day);
+  next.push({ d: day, t, ...Object.fromEntries(PAIRS.map(p => [p, quotes[p].price])) });
+  await env.STORE.put('daily', JSON.stringify(next.slice(-30)));
 }
 
 async function sendTelegram(env, text) {
@@ -100,14 +73,6 @@ async function api(request, env, path) {
     const today = beijingDay(Date.now());
     const prev = (daily || []).filter(d => d.d < today).at(-1);
     return json(Object.fromEntries(PAIRS.map(p => [p, { ...quotes[p], previousClose: prev?.[p] ?? null }])));
-  }
-
-  if (path === '/api/history') {
-    const url = new URL(request.url);
-    const pair = url.searchParams.get('pair');
-    const range = url.searchParams.get('range');
-    if (!PAIRS.includes(pair) || !RANGES[range]) return json({ error: 'Bad pair or range' }, 400);
-    return json(await history(env, pair, range));
   }
 
   if (path === '/api/settings' && request.method === 'GET') {

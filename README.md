@@ -8,7 +8,7 @@ Live at **[fx.etarc.net](https://fx.etarc.net)**. Works on iPhone and Mac as a h
 
 - Shows the CITIC customer buy price (客户购汇价) for GBP→CNY and USD→CNY, refreshed every 30 seconds while open
 - Checks both prices every 10 minutes and sends one Telegram alert when a price drops below its floor; it re-arms once the price climbs back above
-- Records every check, since CITIC publishes no history, and charts the recorded prices
+- Shows the change since yesterday's last price (CITIC publishes no history, so the Worker records it)
 - Floors are edited in the app, protected by a password
 
 Prices come from the feed behind the public rate table on citicbank.com. They are for reference only; the price in the CITIC app when you trade is final.
@@ -20,9 +20,9 @@ One Cloudflare Worker:
 | Part | Where |
 |---|---|
 | Web app | `public/` |
-| API (`/api/rates`, `/api/history`, `/api/settings`, `/api/test`) | `src/worker.js` |
+| API (`/api/rates`, `/api/settings`, `/api/test`) | `src/worker.js` |
 | Parsing, alert rules, messages | `src/logic.js` |
-| Floors, alert state, recorded prices | Workers KV (`STORE`) |
+| Floors, alert state, daily closing prices | Workers KV (`STORE`) |
 | 10-minute check | Cron trigger in `wrangler.jsonc` |
 
 ## Develop

@@ -63,6 +63,8 @@ h1 { font-size: 22px; margin: 0; }
 h2 { font-size: 17px; margin: 0 0 4px; }
 .muted { color: var(--muted); font-size: 14px; }
 .error { color: var(--down); font-size: 14px; }
+.small { font-size: 12px; margin: 8px 0 0; }
+.small:empty { display: none; }
 
 button, input { font: inherit; color: inherit; }
 

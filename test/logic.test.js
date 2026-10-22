@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseChart, evaluate, validFloor } from '../src/logic.js';
+import { parseCitic, beijingDay, evaluate, validFloor } from '../src/logic.js';
 
 const none = { GBP: false, USD: false };
 
@@ -20,15 +20,22 @@ test('re-arms only when the rate climbs back above the floor', () => {
   assert.equal(evaluate({ GBP: 8.8 }, { GBP: 8.9 }, state).alerts.length, 1);
 });
 
-test('parses Yahoo chart data and skips empty points', () => {
-  const parsed = parseChart({ chart: { result: [{
-    meta: { regularMarketPrice: 6.67, regularMarketTime: 100, chartPreviousClose: 6.69 },
-    timestamp: [1, 2, 3],
-    indicators: { quote: [{ close: [6.69, null, 6.67] }] },
-  }] } });
-  assert.equal(parsed.price, 6.67);
-  assert.deepEqual(parsed.points, [{ t: 1, rate: 6.69 }, { t: 3, rate: 6.67 }]);
-  assert.throws(() => parseChart({ chart: { result: [] } }));
+test('parses the CITIC rate feed', () => {
+  const row = (curCode, buy, sell) => ({ quotePriceDate: '2026年10月22日', quotePriceTime: '20:33:52', curCode, cstexcBuyPrice: buy, cstexcSellPrice: sell });
+  const text = 'cb(' + JSON.stringify({ retCode: 'AAAAAAA', content: { resultList: [
+    row('014001', '666.34', '669.29'), row('012001', '889.14', '895.87'),
+  ] } }) + ')';
+  const rates = parseCitic(text);
+  assert.equal(rates.GBP.price, 8.9587);
+  assert.equal(rates.USD.price, 6.6929);
+  // 20:33:52 Beijing = 12:33:52 UTC
+  assert.equal(new Date(rates.GBP.time * 1000).toISOString(), '2026-10-22T12:33:52.000Z');
+  assert.throws(() => parseCitic('cb({"content":{"resultList":[]}})'));
+});
+
+test('buckets days by Beijing time', () => {
+  assert.equal(beijingDay(Date.parse('2026-10-22T15:59:00Z')), '2026-10-22');
+  assert.equal(beijingDay(Date.parse('2026-10-22T16:00:00Z')), '2026-10-23');
 });
 
 test('validates floors', () => {

@@ -1,4 +1,4 @@
-import { PAIRS, RANGES, parseChart, validFloor, evaluate, alertMessage } from './logic.js';
+import { PAIRS, RANGES, parseCitic, beijingDay, validFloor, evaluate, alertMessage } from './logic.js';
 
 const EMPTY = { floors: { GBP: null, USD: null }, alerted: { GBP: false, USD: false }, lastCheck: null };
 
@@ -10,11 +10,51 @@ async function save(env, data) {
   await env.STORE.put('data', JSON.stringify(data));
 }
 
-async function fetchChart(pair, range = '1d') {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${pair}CNY=X?interval=${RANGES[range]}&range=${range}`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  if (!res.ok) throw new Error(`Rate source returned ${res.status}`);
-  return parseChart(await res.json());
+const DAY = 86400 * 1000;
+
+// The same feed that powers the rate table on citicbank.com.
+async function fetchCitic() {
+  const res = await fetch('https://etrade.citicbank.com/portalweb/cms/getForeignExchRate.htm?callback=cb', {
+    headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.citicbank.com/' },
+  });
+  if (!res.ok) throw new Error(`CITIC returned ${res.status}`);
+  return parseCitic(await res.text());
+}
+
+// CITIC has no public history, so every check is recorded:
+// `day:YYYY-MM-DD` holds that day's samples, `daily` the last sample of each day.
+async function record(env, quotes) {
+  const t = Math.max(...PAIRS.map(p => quotes[p].time));
+  const sample = { t, ...Object.fromEntries(PAIRS.map(p => [p, quotes[p].price])) };
+  const day = beijingDay(t * 1000);
+
+  const samples = (await env.STORE.get(`day:${day}`, 'json')) || [];
+  if (samples.at(-1)?.t === t) return;
+  samples.push(sample);
+  const daily = ((await env.STORE.get('daily', 'json')) || []).filter(d => d.d !== day);
+  daily.push({ d: day, ...sample });
+  await Promise.all([
+    env.STORE.put(`day:${day}`, JSON.stringify(samples), { expirationTtl: 8 * 86400 }),
+    env.STORE.put('daily', JSON.stringify(daily.slice(-400))),
+  ]);
+}
+
+async function history(env, pair, range) {
+  const now = Date.now();
+  const days = RANGES[range];
+  const daily = (await env.STORE.get('daily', 'json')) || [];
+  const since = daily[0]?.d ?? null;
+  let rows;
+  if (days <= 5) {
+    // Intraday samples, one KV key per Beijing day.
+    const keys = Array.from({ length: days + 1 }, (_, i) => `day:${beijingDay(now - (days - i) * DAY)}`);
+    rows = (await Promise.all(keys.map(k => env.STORE.get(k, 'json')))).flatMap(r => r || []);
+    rows = rows.filter(r => r.t * 1000 >= now - days * DAY);
+  } else {
+    const cutoff = beijingDay(now - days * DAY);
+    rows = daily.filter(r => r.d >= cutoff);
+  }
+  return { since, points: rows.map(r => ({ t: r.t, rate: r[pair] })) };
 }
 
 async function sendTelegram(env, text) {
@@ -38,8 +78,9 @@ const json = (body, status = 200) => Response.json(body, { status, headers: { 'C
 
 async function check(env) {
   const data = await load(env);
-  const quotes = await Promise.all(PAIRS.map(p => fetchChart(p)));
-  const rates = Object.fromEntries(PAIRS.map((p, i) => [p, quotes[i].price]));
+  const quotes = await fetchCitic();
+  await record(env, quotes);
+  const rates = Object.fromEntries(PAIRS.map(p => [p, quotes[p].price]));
   const { alerts, alerted } = evaluate(rates, data.floors, data.alerted);
   for (const alert of alerts) {
     try {
@@ -54,11 +95,11 @@ async function check(env) {
 
 async function api(request, env, path) {
   if (path === '/api/rates') {
-    const quotes = await Promise.all(PAIRS.map(p => fetchChart(p)));
-    return json(Object.fromEntries(PAIRS.map((p, i) => {
-      const { price, time, previousClose } = quotes[i];
-      return [p, { price, time, previousClose }];
-    })));
+    const [quotes, daily] = await Promise.all([fetchCitic(), env.STORE.get('daily', 'json')]);
+    // Previous close = last recorded price from an earlier Beijing day.
+    const today = beijingDay(Date.now());
+    const prev = (daily || []).filter(d => d.d < today).at(-1);
+    return json(Object.fromEntries(PAIRS.map(p => [p, { ...quotes[p], previousClose: prev?.[p] ?? null }])));
   }
 
   if (path === '/api/history') {
@@ -66,7 +107,7 @@ async function api(request, env, path) {
     const pair = url.searchParams.get('pair');
     const range = url.searchParams.get('range');
     if (!PAIRS.includes(pair) || !RANGES[range]) return json({ error: 'Bad pair or range' }, 400);
-    return json((await fetchChart(pair, range)).points);
+    return json(await history(env, pair, range));
   }
 
   if (path === '/api/settings' && request.method === 'GET') {
@@ -94,7 +135,7 @@ async function api(request, env, path) {
   if (path === '/api/test' && request.method === 'POST') {
     if (!(await authorized(request, env))) return json({ error: 'Wrong password' }, 401);
     // Send a real-looking alert so the format can be checked.
-    const { price } = await fetchChart('GBP');
+    const { price } = (await fetchCitic()).GBP;
     const { floors } = await load(env);
     await sendTelegram(env, `[Test]\n${alertMessage({ pair: 'GBP', rate: price, floor: floors.GBP ?? price })}`);
     return json({ ok: true });

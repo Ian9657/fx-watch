@@ -8,7 +8,7 @@ const store = {
 };
 
 let pair = store.get('pair') || 'GBP';
-let range = store.get('range') || '1mo';
+let range = store.get('range') || '1d';
 let rates = {};
 let floors = { GBP: null, USD: null };
 
@@ -43,11 +43,14 @@ function renderCards() {
   }
 }
 
-function renderChart(points) {
+function renderChart({ since, points }) {
   const box = $('chart');
   box.replaceChildren();
-  if (!points.length) {
-    box.textContent = 'No data for this range.';
+  $('chart-note').textContent = since
+    ? `CITIC has no public history, so FX Watch records prices every 10 minutes. Recording since ${new Date(since).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.`
+    : '';
+  if (points.length < 2) {
+    box.textContent = 'Not enough recorded prices for this range yet.';
     return;
   }
   const W = 360, H = 190, L = 4, R = 44, T = 10, B = 22;
@@ -82,7 +85,7 @@ function renderChart(points) {
   const line = points.map((p, i) => `${x(i)},${y(p.rate)}`).join(' ');
   add('polyline', { points: line, class: 'line' });
 
-  const fmt = t => new Date(t * 1000).toLocaleDateString('en-GB', range === '1d'
+  const fmt = t => new Date(t * 1000).toLocaleString('en-GB', range === '1d'
     ? { hour: '2-digit', minute: '2-digit' }
     : { day: 'numeric', month: 'short' });
   add('text', { x: L, y: H - 6, class: 'axis' }, fmt(points[0].t));

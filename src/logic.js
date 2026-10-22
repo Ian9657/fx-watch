@@ -1,25 +1,36 @@
 // Pure helpers shared by the worker and tests. No I/O here.
 
 export const PAIRS = ['GBP', 'USD'];
-export const RANGES = { '1d': '5m', '5d': '30m', '1mo': '1d', '3mo': '1d', '1y': '1d' };
+export const RANGES = { '1d': 1, '5d': 5, '1mo': 31, '3mo': 92, '1y': 366 };
 
-// Yahoo chart API → { price, time, previousClose, points: [{ t, rate }] }
-export function parseChart(json) {
-  const result = json?.chart?.result?.[0];
-  const price = result?.meta?.regularMarketPrice;
-  if (!Number.isFinite(price) || price <= 0) throw new Error('No price in response');
-  const times = result.timestamp || [];
-  const closes = result.indicators?.quote?.[0]?.close || [];
-  const points = [];
-  times.forEach((t, i) => {
-    if (Number.isFinite(closes[i]) && closes[i] > 0) points.push({ t, rate: closes[i] });
-  });
-  return {
-    price,
-    time: result.meta.regularMarketTime,
-    previousClose: result.meta.chartPreviousClose ?? null,
-    points,
-  };
+// CITIC Bank currency codes in its rate feed.
+const CITIC_CODES = { GBP: '012001', USD: '014001' };
+
+// CITIC quotes are Beijing time (UTC+8).
+const BEIJING = 8 * 3600 * 1000;
+
+// CITIC rate feed (JSONP) → { GBP: { price, time }, USD: ... }
+// price = customer buy price (客户购汇价) per 1 unit; time = epoch seconds.
+export function parseCitic(text) {
+  const json = JSON.parse(text.slice(text.indexOf('(') + 1, text.lastIndexOf(')')));
+  const rows = json?.content?.resultList;
+  if (!Array.isArray(rows)) throw new Error('Unexpected CITIC response');
+  const rates = {};
+  for (const pair of PAIRS) {
+    const row = rows.find(r => r.curCode === CITIC_CODES[pair]);
+    const price = Number(row?.cstexcSellPrice) / 100;
+    if (!Number.isFinite(price) || price <= 0) throw new Error(`No CITIC price for ${pair}`);
+    const [y, m, d] = row.quotePriceDate.match(/\d+/g).map(Number);
+    const [hh, mm, ss] = row.quotePriceTime.split(':').map(Number);
+    const time = (Date.UTC(y, m - 1, d, hh, mm, ss) - BEIJING) / 1000;
+    rates[pair] = { price, time };
+  }
+  return rates;
+}
+
+// Beijing calendar date (YYYY-MM-DD) for an epoch-ms timestamp.
+export function beijingDay(ms) {
+  return new Date(ms + BEIJING).toISOString().slice(0, 10);
 }
 
 export function validFloor(value) {
@@ -49,8 +60,8 @@ export function evaluate(rates, floors, alerted) {
 }
 
 export function alertMessage({ pair, rate, floor }) {
-  return `${pair}/CNY is below your floor\n` +
-    `1 ${pair} = ${rate.toFixed(4)} CNY (floor ${floor.toFixed(4)})\n` +
-    `Market mid rate. Check your bank's price before buying.\n` +
+  return `${pair} is below your floor\n` +
+    `CITIC buy price: 1 ${pair} = ${rate.toFixed(4)} CNY\n` +
+    `Floor: ${floor.toFixed(4)}\n` +
     `https://fx.etarc.net`;
 }

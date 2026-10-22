@@ -1,0 +1,69 @@
+name: Daily GBP-CNY monitor
+on:
+  schedule:
+    - cron: '17 17 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Choose dry-run first, then test-notification; monitor sends real alerts'
+        type: choice
+        options: [dry-run, test-notification, monitor]
+        default: dry-run
+permissions:
+  contents: write
+concurrency:
+  group: gbp-cny-monitor
+  cancel-in-progress: false
+jobs:
+  monitor:
+    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_MONITORING == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tests
+        run: python -m unittest discover -s tests -v
+      - name: Restore durable state (separate branch)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git show-ref --verify --quiet refs/remotes/origin/monitor-state; then
+            git show origin/monitor-state:state.json > monitor-state.json
+          fi
+      - name: Check or test notification
+        env:
+          MODE: ${{ inputs.mode || 'monitor' }}
+          TARGET_RATE: ${{ vars.TARGET_RATE }}
+          MONITOR_PAIR: ${{ vars.MONITOR_PAIR || 'GBP' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$MODE" in
+            dry-run) python scripts/monitor.py --dry-run ;;
+            test-notification) python scripts/monitor.py --test-notification ;;
+            monitor) python scripts/monitor.py ;;
+            *) exit 1 ;;
+          esac
+      - name: Persist successful monitoring state
+        if: (inputs.mode == 'monitor' || github.event_name == 'schedule') && success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          blob=$(git hash-object -w monitor-state.json)
+          tree=$(printf '100644 blob %s\tstate.json\n' "$blob" | git mktree)
+          parent=()
+          if git show-ref --verify --quiet refs/remotes/origin/monitor-state; then
+            parent=(-p origin/monitor-state)
+          fi
+          commit=$(git commit-tree "$tree" "${parent[@]}" -m 'Persist monitor state')
+          git push origin "$commit:refs/heads/monitor-state"

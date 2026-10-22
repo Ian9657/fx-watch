@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+monitor-state.json
+.DS_Store

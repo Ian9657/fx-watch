@@ -94,6 +94,7 @@ button, input { font: inherit; color: inherit; }
 .change { font-size: 12px; font-variant-numeric: tabular-nums; }
 .change.up { color: var(--up); }
 .change.down { color: var(--down); }
+.quoted { font-size: 12px; color: var(--muted); }
 .floor { font-size: 13px; color: var(--muted); }
 .card.below .floor { color: var(--down); font-weight: 600; }
 

@@ -1,4 +1,4 @@
-import { PAIRS, RANGES, parseCitic, beijingDay, validFloor, evaluate, alertMessage } from './logic.js';
+import { PAIRS, RANGES, parseCitic, beijingDay, validFloor, evaluate, alertMessage, testMessage } from './logic.js';
 
 const EMPTY = { floors: { GBP: null, USD: null }, alerted: { GBP: false, USD: false }, lastCheck: null };
 
@@ -134,10 +134,8 @@ async function api(request, env, path) {
 
   if (path === '/api/test' && request.method === 'POST') {
     if (!(await authorized(request, env))) return json({ error: 'Wrong password' }, 401);
-    // Send a real-looking alert so the format can be checked.
-    const { price } = (await fetchCitic()).GBP;
-    const { floors } = await load(env);
-    await sendTelegram(env, `[Test]\n${alertMessage({ pair: 'GBP', rate: price, floor: floors.GBP ?? price })}`);
+    const [quotes, { floors }] = await Promise.all([fetchCitic(), load(env)]);
+    await sendTelegram(env, testMessage(quotes, floors));
     return json({ ok: true });
   }
 

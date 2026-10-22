@@ -65,3 +65,12 @@ export function alertMessage({ pair, rate, floor }) {
     `Floor: ${floor.toFixed(4)}\n` +
     `https://fx.etarc.net`;
 }
+
+// Confirms delivery only; says nothing about whether a floor was crossed.
+export function testMessage(quotes, floors) {
+  const list = f => PAIRS.map(p => `${p} ${f(p)}`).join(' · ');
+  return `FX Watch test: notifications are working.\n` +
+    `CITIC buy price now: ${list(p => quotes[p].price.toFixed(4))}\n` +
+    `Floors: ${list(p => floors[p] == null ? 'off' : floors[p].toFixed(4))}\n` +
+    `You'll get a message when a price drops below its floor.`;
+}

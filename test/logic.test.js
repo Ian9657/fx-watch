@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, beijingDay, evaluate, validFloor } from '../src/logic.js';
+import { parseCitic, beijingDay, evaluate, validFloor, testMessage } from '../src/logic.js';
 
 const none = { GBP: false, USD: false };
 
@@ -43,4 +43,11 @@ test('validates floors', () => {
   assert.ok(validFloor(8.9));
   assert.ok(!validFloor(0));
   assert.ok(!validFloor('8.9'));
+});
+
+test('test message does not claim a floor was crossed', () => {
+  const msg = testMessage({ GBP: { price: 8.958 }, USD: { price: 6.69 } }, { GBP: 8.9, USD: null });
+  assert.match(msg, /GBP 8\.9580 · USD 6\.6900/);
+  assert.match(msg, /Floors: GBP 8\.9000 · USD off/);
+  assert.doesNotMatch(msg, /below your floor/);
 });

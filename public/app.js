@@ -31,6 +31,7 @@ function renderCards() {
     const r = rates[p];
     const floor = floors[p];
     $(`rate-${p}`).textContent = r ? r.price.toFixed(4) : '—';
+    $(`quoted-${p}`).textContent = r ? `Quoted ${new Date(r.time * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : '';
     if (r?.previousClose) {
       const diff = r.price - r.previousClose;
       const pct = (diff / r.previousClose) * 100;
@@ -173,7 +174,7 @@ $('test').addEventListener('click', async () => {
   $('form-status').textContent = 'Sending…';
   try {
     await authed('/api/test', { method: 'POST', headers: {} });
-    $('form-status').textContent = 'Sent a sample alert. Check Telegram.';
+    $('form-status').textContent = 'Sent. Check Telegram.';
   } catch (err) {
     $('form-status').textContent = err.message;
   }

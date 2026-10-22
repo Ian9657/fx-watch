@@ -29,12 +29,14 @@
         <span class="pair">GBP · CITIC buy</span>
         <span class="rate" id="rate-GBP">—</span>
         <span class="change" id="change-GBP"></span>
+        <span class="quoted" id="quoted-GBP"></span>
         <span class="floor" id="floor-GBP"></span>
       </button>
       <button class="card" data-pair="USD" aria-pressed="false">
         <span class="pair">USD · CITIC buy</span>
         <span class="rate" id="rate-USD">—</span>
         <span class="change" id="change-USD"></span>
+        <span class="quoted" id="quoted-USD"></span>
         <span class="floor" id="floor-USD"></span>
       </button>
     </section>
@@ -53,14 +55,14 @@
 
     <section class="panel">
       <h2>Alerts</h2>
-      <p class="muted">Telegram message when the CITIC buy price drops below your floor. Leave empty to turn off.</p>
+      <p class="muted">Telegram message when the CITIC buy price drops below your floor. Leave empty to turn off. "Test Telegram" just checks that messages reach you.</p>
       <form id="floors">
         <label>GBP floor <input id="input-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off"></label>
         <label>USD floor <input id="input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off"></label>
         <label id="password-row" hidden>Password <input id="password" type="password" autocomplete="current-password"></label>
         <div class="actions">
           <button type="submit">Save</button>
-          <button type="button" id="test" class="secondary">Send test</button>
+          <button type="button" id="test" class="secondary">Test Telegram</button>
         </div>
         <p id="form-status" class="muted" role="status"></p>
       </form>

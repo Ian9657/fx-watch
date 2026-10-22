@@ -92,10 +92,9 @@ function renderChart(points) {
 
 async function loadRates() {
   try {
-    rates = await getJSON('/api/rates');
+    rates = await getJSON('/api/rates', { cache: 'no-store' });
     showError('');
-    const latest = Math.max(...PAIRS.map(p => rates[p].time));
-    $('updated').textContent = `Updated ${new Date(latest * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+    $('updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
   } catch (err) {
     showError(`Couldn't load rates: ${err.message}`);
   }
@@ -105,7 +104,7 @@ async function loadRates() {
 async function loadChart() {
   document.querySelectorAll('[data-range]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.range === range)));
   try {
-    renderChart(await getJSON(`/api/history?pair=${pair}&range=${range}`));
+    renderChart(await getJSON(`/api/history?pair=${pair}&range=${range}`, { cache: 'no-store' }));
   } catch (err) {
     $('chart').textContent = `Couldn't load chart: ${err.message}`;
   }
@@ -113,7 +112,7 @@ async function loadChart() {
 
 async function loadSettings() {
   try {
-    ({ floors } = await getJSON('/api/settings'));
+    ({ floors } = await getJSON('/api/settings', { cache: 'no-store' }));
     for (const p of PAIRS) $(`input-${p}`).value = floors[p] ?? '';
   } catch {}
   renderCards();
@@ -171,7 +170,7 @@ $('test').addEventListener('click', async () => {
   $('form-status').textContent = 'Sending…';
   try {
     await authed('/api/test', { method: 'POST', headers: {} });
-    $('form-status').textContent = 'Sent. Check Telegram.';
+    $('form-status').textContent = 'Sent a sample alert. Check Telegram.';
   } catch (err) {
     $('form-status').textContent = err.message;
   }
@@ -190,10 +189,23 @@ document.querySelectorAll('[data-range]').forEach(b => b.addEventListener('click
   loadChart();
 }));
 
-// Refresh every minute while the app is open, and on return from background.
-setInterval(() => { if (!document.hidden) loadRates(); }, 60_000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) loadRates(); });
+let refreshing = false;
+async function refreshAll() {
+  if (refreshing) return;
+  refreshing = true;
+  $('refresh').disabled = true;
+  await Promise.all([loadSettings(), loadRates(), loadChart()]);
+  $('refresh').disabled = false;
+  refreshing = false;
+}
 
-loadSettings();
-loadRates();
-loadChart();
+$('refresh').addEventListener('click', refreshAll);
+
+// Home-screen apps have no reload button and iOS freezes them in the
+// background, so refresh on a timer and whenever the app comes back.
+setInterval(() => { if (!document.hidden) loadRates(); }, 30_000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAll(); });
+window.addEventListener('pageshow', e => { if (e.persisted) refreshAll(); });
+window.addEventListener('focus', refreshAll);
+
+refreshAll();

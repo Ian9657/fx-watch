@@ -49,7 +49,8 @@ export function evaluate(rates, floors, alerted) {
 }
 
 export function alertMessage({ pair, rate, floor }) {
-  return `${pair}/CNY dropped below your floor\n` +
-    `Now: 1 ${pair} = ${rate.toFixed(4)} CNY\n` +
-    `Floor: ${floor.toFixed(4)}`;
+  return `${pair}/CNY is below your floor\n` +
+    `1 ${pair} = ${rate.toFixed(4)} CNY (floor ${floor.toFixed(4)})\n` +
+    `Market mid rate. Check your bank's price before buying.\n` +
+    `https://fx.etarc.net`;
 }

@@ -93,7 +93,10 @@ async function api(request, env, path) {
 
   if (path === '/api/test' && request.method === 'POST') {
     if (!(await authorized(request, env))) return json({ error: 'Wrong password' }, 401);
-    await sendTelegram(env, 'Test from FX Watch: notifications are working.');
+    // Send a real-looking alert so the format can be checked.
+    const { price } = await fetchChart('GBP');
+    const { floors } = await load(env);
+    await sendTelegram(env, `[Test]\n${alertMessage({ pair: 'GBP', rate: price, floor: floors.GBP ?? price })}`);
     return json({ ok: true });
   }
 

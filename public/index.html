@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f6f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141614" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="FX Watch">
+  <title>FX Watch</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon-512.png">
+  <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>FX Watch</h1>
+      <span id="updated" class="muted">Loading…</span>
+    </header>
+
+    <p id="error" class="error" hidden></p>
+
+    <section class="cards">
+      <button class="card" data-pair="GBP" aria-pressed="true">
+        <span class="pair">GBP → CNY</span>
+        <span class="rate" id="rate-GBP">—</span>
+        <span class="change" id="change-GBP"></span>
+        <span class="floor" id="floor-GBP"></span>
+      </button>
+      <button class="card" data-pair="USD" aria-pressed="false">
+        <span class="pair">USD → CNY</span>
+        <span class="rate" id="rate-USD">—</span>
+        <span class="change" id="change-USD"></span>
+        <span class="floor" id="floor-USD"></span>
+      </button>
+    </section>
+
+    <section class="panel">
+      <div class="ranges" role="group" aria-label="Chart range">
+        <button data-range="1d" aria-pressed="false">1D</button>
+        <button data-range="5d" aria-pressed="false">5D</button>
+        <button data-range="1mo" aria-pressed="true">1M</button>
+        <button data-range="3mo" aria-pressed="false">3M</button>
+        <button data-range="1y" aria-pressed="false">1Y</button>
+      </div>
+      <div id="chart" class="chart"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Alerts</h2>
+      <p class="muted">Telegram message when a rate drops below its floor. Leave empty to turn off.</p>
+      <form id="floors">
+        <label>GBP floor <input id="input-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off"></label>
+        <label>USD floor <input id="input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off"></label>
+        <label id="password-row" hidden>Password <input id="password" type="password" autocomplete="current-password"></label>
+        <div class="actions">
+          <button type="submit">Save</button>
+          <button type="button" id="test" class="secondary">Send test</button>
+        </div>
+        <p id="form-status" class="muted" role="status"></p>
+      </form>
+    </section>
+
+    <footer class="muted">Market mid rates via Yahoo Finance. Your bank's rate will differ.</footer>
+  </main>
+</body>
+</html>

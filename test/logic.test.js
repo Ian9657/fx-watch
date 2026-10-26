@@ -1,23 +1,51 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, beijingDay, evaluate, validFloor, testMessage } from '../src/logic.js';
+import { parseCitic, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage } from '../src/logic.js';
 
-const none = { GBP: false, USD: false };
+const none = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
+const limits = (gbp, usd = {}) => ({
+  GBP: { floor: null, ceiling: null, ...gbp },
+  USD: { floor: null, ceiling: null, ...usd },
+});
 
 test('alerts once when a rate drops below its floor', () => {
-  const first = evaluate({ GBP: 8.8, USD: 6.7 }, { GBP: 8.9, USD: null }, none);
-  assert.deepEqual(first.alerts.map(a => a.pair), ['GBP']);
-  const second = evaluate({ GBP: 8.7, USD: 6.7 }, { GBP: 8.9, USD: null }, first.alerted);
+  const first = evaluate({ GBP: 8.8, USD: 6.7 }, limits({ floor: 8.9 }), none);
+  assert.deepEqual(first.alerts.map(a => [a.pair, a.side]), [['GBP', 'floor']]);
+  const second = evaluate({ GBP: 8.7, USD: 6.7 }, limits({ floor: 8.9 }), first.alerted);
   assert.equal(second.alerts.length, 0);
 });
 
-test('re-arms only when the rate climbs back above the floor', () => {
-  let state = { GBP: true, USD: false };
-  state = evaluate({ GBP: 8.9 }, { GBP: 8.9 }, state).alerted;
-  assert.equal(state.GBP, true);
-  state = evaluate({ GBP: 9.0 }, { GBP: 8.9 }, state).alerted;
-  assert.equal(state.GBP, false);
-  assert.equal(evaluate({ GBP: 8.8 }, { GBP: 8.9 }, state).alerts.length, 1);
+test('alerts once when a rate rises above its ceiling', () => {
+  const first = evaluate({ GBP: 9.1, USD: 6.7 }, limits({ ceiling: 9.0 }), none);
+  assert.deepEqual(first.alerts.map(a => [a.pair, a.side]), [['GBP', 'ceiling']]);
+  assert.equal(evaluate({ GBP: 9.2 }, limits({ ceiling: 9.0 }), first.alerted).alerts.length, 0);
+});
+
+test('re-arms only when the rate is strictly back inside the limit', () => {
+  const l = limits({ floor: 8.9, ceiling: 9.1 });
+  const both = { GBP: { floor: true, ceiling: true }, USD: { floor: false, ceiling: false } };
+  // Equal to a limit keeps that side quiet.
+  assert.equal(evaluate({ GBP: 8.9 }, l, both).alerted.GBP.floor, true);
+  assert.equal(evaluate({ GBP: 9.1 }, l, both).alerted.GBP.ceiling, true);
+  // Strictly inside re-arms both sides, so the next crossing alerts again.
+  const rearmed = evaluate({ GBP: 9.0 }, l, both).alerted;
+  assert.deepEqual(rearmed.GBP, { floor: false, ceiling: false });
+  assert.equal(evaluate({ GBP: 8.8 }, l, rearmed).alerts[0].side, 'floor');
+  assert.equal(evaluate({ GBP: 9.2 }, l, rearmed).alerts[0].side, 'ceiling');
+});
+
+test('migrates settings saved before ceilings existed', () => {
+  const data = migrate({ floors: { GBP: 8.9, USD: null }, alerted: { GBP: true, USD: false }, lastCheck: 1 });
+  assert.deepEqual(data.limits, limits({ floor: 8.9 }));
+  assert.deepEqual(data.alerted.GBP, { floor: true, ceiling: false });
+  assert.equal(data.lastCheck, 1);
+  assert.equal('floors' in data, false);
+  assert.deepEqual(migrate({}).limits, limits({}));
+});
+
+test('alert message names the side that was crossed', () => {
+  assert.match(alertMessage({ pair: 'GBP', side: 'ceiling', rate: 9.05, limit: 9 }), /GBP is above your ceiling[\s\S]*Ceiling: 9\.0000/);
+  assert.match(alertMessage({ pair: 'USD', side: 'floor', rate: 6.6, limit: 6.65 }), /USD is below your floor[\s\S]*Floor: 6\.6500/);
 });
 
 test('parses the CITIC rate feed', () => {
@@ -38,16 +66,16 @@ test('buckets days by Beijing time', () => {
   assert.equal(beijingDay(Date.parse('2026-10-22T16:00:00Z')), '2026-10-23');
 });
 
-test('validates floors', () => {
-  assert.ok(validFloor(null));
-  assert.ok(validFloor(8.9));
-  assert.ok(!validFloor(0));
-  assert.ok(!validFloor('8.9'));
+test('validates limits', () => {
+  assert.ok(validLimit(null));
+  assert.ok(validLimit(8.9));
+  assert.ok(!validLimit(0));
+  assert.ok(!validLimit('8.9'));
 });
 
-test('test message does not claim a floor was crossed', () => {
-  const msg = testMessage({ GBP: { price: 8.958 }, USD: { price: 6.69 } }, { GBP: 8.9, USD: null });
+test('test message does not claim a limit was crossed', () => {
+  const msg = testMessage({ GBP: { price: 8.958 }, USD: { price: 6.69 } }, limits({ floor: 8.9, ceiling: 9.1 }));
   assert.match(msg, /GBP 8\.9580 · USD 6\.6900/);
-  assert.match(msg, /Floors: GBP 8\.9000 · USD off/);
-  assert.doesNotMatch(msg, /below your floor/);
+  assert.match(msg, /Alerts: GBP below 8\.9000 or above 9\.1000 · USD off/);
+  assert.doesNotMatch(msg, /your (floor|ceiling)/);
 });

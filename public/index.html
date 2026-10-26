@@ -30,23 +30,32 @@
         <span class="rate" id="rate-GBP">—</span>
         <span class="change" id="change-GBP"></span>
         <span class="quoted" id="quoted-GBP"></span>
-        <span class="floor" id="floor-GBP"></span>
+        <span class="limits" id="limits-GBP"></span>
+        <span class="state" id="state-GBP"></span>
       </article>
       <article class="card" data-pair="USD">
         <span class="pair">USD · CITIC buy</span>
         <span class="rate" id="rate-USD">—</span>
         <span class="change" id="change-USD"></span>
         <span class="quoted" id="quoted-USD"></span>
-        <span class="floor" id="floor-USD"></span>
+        <span class="limits" id="limits-USD"></span>
+        <span class="state" id="state-USD"></span>
       </article>
     </section>
 
     <section class="panel">
       <h2>Alerts</h2>
-      <p class="muted">Telegram message when a price drops below its floor. Leave empty to turn off.</p>
-      <form id="floors">
-        <label>GBP floor <input id="input-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off"></label>
-        <label>USD floor <input id="input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off"></label>
+      <p class="muted">Telegram message when a price drops below its floor or rises above its ceiling. Leave empty to turn off.</p>
+      <form id="limits">
+        <div class="limit-grid">
+          <span></span><span class="col">Floor</span><span class="col">Ceiling</span>
+          <span>GBP</span>
+          <input id="floor-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="GBP floor">
+          <input id="ceiling-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="GBP ceiling">
+          <span>USD</span>
+          <input id="floor-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD floor">
+          <input id="ceiling-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD ceiling">
+        </div>
         <label id="password-row" hidden>Password <input id="password" type="password" autocomplete="current-password"></label>
         <button type="submit" class="save">Save</button>
         <p class="muted small"><span id="form-status" role="status"></span> <button type="button" id="test" class="link">Send a test message</button></p>

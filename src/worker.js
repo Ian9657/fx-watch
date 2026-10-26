@@ -1,9 +1,7 @@
-import { PAIRS, parseCitic, beijingDay, validFloor, evaluate, alertMessage, testMessage } from './logic.js';
-
-const EMPTY = { floors: { GBP: null, USD: null }, alerted: { GBP: false, USD: false }, lastCheck: null };
+import { PAIRS, SIDES, parseCitic, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage } from './logic.js';
 
 async function load(env) {
-  return { ...EMPTY, ...(await env.STORE.get('data', 'json')) };
+  return { lastCheck: null, ...migrate((await env.STORE.get('data', 'json')) || {}) };
 }
 
 async function save(env, data) {
@@ -54,12 +52,12 @@ async function check(env) {
   const quotes = await fetchCitic();
   await record(env, quotes);
   const rates = Object.fromEntries(PAIRS.map(p => [p, quotes[p].price]));
-  const { alerts, alerted } = evaluate(rates, data.floors, data.alerted);
+  const { alerts, alerted } = evaluate(rates, data.limits, data.alerted);
   for (const alert of alerts) {
     try {
       await sendTelegram(env, alertMessage(alert));
     } catch (err) {
-      alerted[alert.pair] = false; // retry on the next check
+      alerted[alert.pair][alert.side] = false; // retry on the next check
       console.error(err.message);
     }
   }
@@ -76,31 +74,40 @@ async function api(request, env, path) {
   }
 
   if (path === '/api/settings' && request.method === 'GET') {
-    const { floors, lastCheck } = await load(env);
-    return json({ floors, lastCheck });
+    const { limits, lastCheck } = await load(env);
+    return json({ limits, lastCheck });
   }
 
   if (path === '/api/settings' && request.method === 'PUT') {
     if (!(await authorized(request, env))) return json({ error: 'Wrong password' }, 401);
     const body = await request.json().catch(() => ({}));
-    const floors = {};
+    const limits = {};
     for (const p of PAIRS) {
-      const v = body.floors?.[p] ?? null;
-      if (!validFloor(v)) return json({ error: `Invalid floor for ${p}` }, 400);
-      floors[p] = v;
+      limits[p] = {};
+      for (const side of SIDES) {
+        const v = body.limits?.[p]?.[side] ?? null;
+        if (!validLimit(v)) return json({ error: `Invalid ${side} for ${p}` }, 400);
+        limits[p][side] = v;
+      }
+      const { floor, ceiling } = limits[p];
+      if (floor != null && ceiling != null && floor >= ceiling) {
+        return json({ error: `${p} floor must be lower than its ceiling` }, 400);
+      }
     }
     const data = await load(env);
-    // A changed floor starts fresh, so it can alert straight away.
-    const alerted = { ...data.alerted };
-    for (const p of PAIRS) if (floors[p] !== data.floors[p]) alerted[p] = false;
-    await save(env, { ...data, floors, alerted });
-    return json({ floors });
+    // A changed limit starts fresh, so it can alert straight away.
+    const alerted = structuredClone(data.alerted);
+    for (const p of PAIRS) for (const side of SIDES) {
+      if (limits[p][side] !== data.limits[p][side]) alerted[p][side] = false;
+    }
+    await save(env, { ...data, limits, alerted });
+    return json({ limits });
   }
 
   if (path === '/api/test' && request.method === 'POST') {
     if (!(await authorized(request, env))) return json({ error: 'Wrong password' }, 401);
-    const [quotes, { floors }] = await Promise.all([fetchCitic(), load(env)]);
-    await sendTelegram(env, testMessage(quotes, floors));
+    const [quotes, { limits }] = await Promise.all([fetchCitic(), load(env)]);
+    await sendTelegram(env, testMessage(quotes, limits));
     return json({ ok: true });
   }
 

@@ -32,44 +32,71 @@ export function beijingDay(ms) {
   return new Date(ms + BEIJING).toISOString().slice(0, 10);
 }
 
-export function validFloor(value) {
+export const SIDES = ['floor', 'ceiling'];
+
+export function validLimit(value) {
   return value === null || (Number.isFinite(value) && value > 0 && value < 1000);
 }
 
-// Decide which pairs need an alert. A pair alerts once when it drops below
-// its floor, then stays quiet until the rate climbs back above the floor.
-export function evaluate(rates, floors, alerted) {
-  const next = { ...alerted };
+// Settings saved before ceilings existed: { floors: { GBP: n } } and
+// alerted: { GBP: bool } → { limits: { GBP: { floor, ceiling } } } and
+// alerted: { GBP: { floor, ceiling } }.
+export function migrate(data) {
+  const limits = data.limits || Object.fromEntries(PAIRS.map(p => [p, { floor: data.floors?.[p] ?? null, ceiling: null }]));
+  const alerted = Object.fromEntries(PAIRS.map(p => {
+    const a = data.alerted?.[p];
+    return [p, typeof a === 'object' && a ? { floor: !!a.floor, ceiling: !!a.ceiling } : { floor: !!a, ceiling: false }];
+  }));
+  const { floors, ...rest } = data;
+  return { ...rest, limits, alerted };
+}
+
+const crossed = (side, rate, limit) => side === 'floor' ? rate < limit : rate > limit;
+
+// Decide which alerts to send. Each side alerts once when the rate crosses
+// its limit (below a floor, above a ceiling), then stays quiet until the rate
+// is strictly back on the other side. Equal to the limit changes nothing.
+export function evaluate(rates, limits, alerted) {
+  const next = {};
   const alerts = [];
   for (const pair of PAIRS) {
+    next[pair] = { ...alerted[pair] };
     const rate = rates[pair];
-    const floor = floors[pair];
-    if (!Number.isFinite(rate) || floor == null) {
-      next[pair] = false;
-      continue;
-    }
-    if (rate < floor && !alerted[pair]) {
-      alerts.push({ pair, rate, floor });
-      next[pair] = true;
-    } else if (rate > floor) {
-      next[pair] = false;
+    for (const side of SIDES) {
+      const limit = limits[pair]?.[side];
+      if (!Number.isFinite(rate) || limit == null) {
+        next[pair][side] = false;
+      } else if (crossed(side, rate, limit)) {
+        if (!alerted[pair]?.[side]) alerts.push({ pair, side, rate, limit });
+        next[pair][side] = true;
+      } else if (rate !== limit) {
+        next[pair][side] = false;
+      }
     }
   }
   return { alerts, alerted: next };
 }
 
-export function alertMessage({ pair, rate, floor }) {
-  return `${pair} is below your floor\n` +
+export function alertMessage({ pair, side, rate, limit }) {
+  const name = side === 'floor' ? 'Floor' : 'Ceiling';
+  return `${pair} is ${side === 'floor' ? 'below' : 'above'} your ${side}\n` +
     `CITIC buy price: 1 ${pair} = ${rate.toFixed(4)} CNY\n` +
-    `Floor: ${floor.toFixed(4)}\n` +
+    `${name}: ${limit.toFixed(4)}\n` +
     `https://fx.etarc.net`;
 }
 
-// Confirms delivery only; says nothing about whether a floor was crossed.
-export function testMessage(quotes, floors) {
+function describeLimits({ floor, ceiling } = {}) {
+  const parts = [];
+  if (floor != null) parts.push(`below ${floor.toFixed(4)}`);
+  if (ceiling != null) parts.push(`above ${ceiling.toFixed(4)}`);
+  return parts.length ? parts.join(' or ') : 'off';
+}
+
+// Confirms delivery only; says nothing about whether a limit was crossed.
+export function testMessage(quotes, limits) {
   const list = f => PAIRS.map(p => `${p} ${f(p)}`).join(' · ');
   return `FX Watch test: notifications are working.\n` +
     `CITIC buy price now: ${list(p => quotes[p].price.toFixed(4))}\n` +
-    `Floors: ${list(p => floors[p] == null ? 'off' : floors[p].toFixed(4))}\n` +
-    `You'll get a message when a price drops below its floor.`;
+    `Alerts: ${list(p => describeLimits(limits[p]))}\n` +
+    `You'll get a message when a price crosses one of these.`;
 }

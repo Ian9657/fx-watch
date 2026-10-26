@@ -7,7 +7,7 @@
   --accent: #1f6b4f;
   --up: #1f6b4f;
   --down: #b4442f;
-  --floor: #b8862f;
+  --warn: #b8862f;
   color-scheme: light;
 }
 
@@ -21,7 +21,7 @@
     --accent: #5fbf93;
     --up: #5fbf93;
     --down: #ec7b62;
-    --floor: #d9a94f;
+    --warn: #d9a94f;
     color-scheme: dark;
   }
 }
@@ -92,8 +92,12 @@ button, input { font: inherit; color: inherit; }
 .change.up { color: var(--up); }
 .change.down { color: var(--down); }
 .quoted { font-size: 12px; color: var(--muted); }
-.floor { font-size: 13px; color: var(--muted); }
-.card.below .floor { color: var(--down); font-weight: 600; }
+.limits { font-size: 13px; color: var(--muted); }
+.state { font-size: 13px; font-weight: 600; }
+.state:empty { display: none; }
+.card.below .state { color: var(--down); }
+.card.above { border-color: var(--warn); }
+.card.above .state { color: var(--warn); }
 
 .panel {
   margin-top: 12px;
@@ -112,6 +116,15 @@ label {
   font-size: 15px;
 }
 label[hidden] { display: none; }
+.limit-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+  font-size: 15px;
+}
+.limit-grid .col { font-size: 13px; color: var(--muted); text-align: right; padding-right: 10px; }
+.limit-grid input { width: 100%; }
 input {
   width: 9em;
   min-width: 0;

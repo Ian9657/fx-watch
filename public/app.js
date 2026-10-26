@@ -8,7 +8,8 @@ const store = {
 };
 
 let rates = {};
-let floors = { GBP: null, USD: null };
+const SIDES = ['floor', 'ceiling'];
+let limits = { GBP: { floor: null, ceiling: null }, USD: { floor: null, ceiling: null } };
 
 async function getJSON(url, options) {
   const res = await fetch(url, options);
@@ -26,7 +27,7 @@ function renderCards() {
   for (const p of PAIRS) {
     const card = document.querySelector(`[data-pair="${p}"]`);
     const r = rates[p];
-    const floor = floors[p];
+    const { floor, ceiling } = limits[p];
     $(`rate-${p}`).textContent = r ? r.price.toFixed(4) : '—';
     $(`quoted-${p}`).textContent = r ? `Quoted ${new Date(r.time * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : '';
     if (r?.previousClose) {
@@ -36,8 +37,15 @@ function renderCards() {
       $(`change-${p}`).className = `change ${diff >= 0 ? 'up' : 'down'}`;
     }
     const below = r && floor != null && r.price < floor;
-    $(`floor-${p}`).textContent = floor == null ? 'No floor' : `Floor ${floor.toFixed(4)}${below ? ' · below' : ''}`;
+    const above = r && ceiling != null && r.price > ceiling;
+    $(`limits-${p}`).textContent =
+      floor != null && ceiling != null ? `${floor.toFixed(4)} – ${ceiling.toFixed(4)}`
+      : floor != null ? `Floor ${floor.toFixed(4)}`
+      : ceiling != null ? `Ceiling ${ceiling.toFixed(4)}`
+      : 'No alerts';
+    $(`state-${p}`).textContent = below ? 'Below floor' : above ? 'Above ceiling' : '';
     card.classList.toggle('below', !!below);
+    card.classList.toggle('above', !!above);
   }
 }
 
@@ -54,8 +62,8 @@ async function loadRates() {
 
 async function loadSettings() {
   try {
-    ({ floors } = await getJSON('/api/settings', { cache: 'no-store' }));
-    for (const p of PAIRS) $(`input-${p}`).value = floors[p] ?? '';
+    ({ limits } = await getJSON('/api/settings', { cache: 'no-store' }));
+    for (const p of PAIRS) for (const side of SIDES) $(`${side}-${p}`).value = limits[p][side] ?? '';
   } catch {}
   renderCards();
 }
@@ -86,19 +94,22 @@ async function authed(url, options) {
   }
 }
 
-$('floors').addEventListener('submit', async e => {
+$('limits').addEventListener('submit', async e => {
   e.preventDefault();
   const next = {};
   for (const p of PAIRS) {
-    const raw = $(`input-${p}`).value.trim();
-    next[p] = raw === '' ? null : Number(raw);
+    next[p] = {};
+    for (const side of SIDES) {
+      const raw = $(`${side}-${p}`).value.trim();
+      next[p][side] = raw === '' ? null : Number(raw);
+    }
   }
   $('form-status').textContent = 'Saving…';
   try {
-    ({ floors } = await authed('/api/settings', {
+    ({ limits } = await authed('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ floors: next }),
+      body: JSON.stringify({ limits: next }),
     }));
     $('form-status').textContent = 'Saved.';
     renderCards();

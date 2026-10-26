@@ -264,7 +264,8 @@ function render() {
 }
 
 // The tape leads with the live quote when it's newer than the last recorded
-// one, then the recorded quotes. Arrows compare each line with the one after.
+// one, then the recorded quotes, for the currency on the dial. Arrows
+// compare each line with the one after.
 let tapeKey = '';
 function drawTape() {
   const live = PAIRS.every(p => rates[p])
@@ -272,7 +273,7 @@ function drawTape() {
     : null;
   const lines = live && (!tape[0] || live.t > tape[0].t) ? [live, ...tape] : tape;
   const arrow = (now, before) => before == null ? '' : now > before ? ' ▲' : now < before ? ' ▼' : ' =';
-  const texts = lines.map((q, i) => `${time(new Date(q.t * 1000))}  ${PAIRS.map(p => `${p} ${q[p].toFixed(4)}${arrow(q[p], lines[i + 1]?.[p])}`).join('  ')}   ·`);
+  const texts = lines.map((q, i) => `${time(new Date(q.t * 1000))}  ${pair} ${q[pair].toFixed(4)}${arrow(q[pair], lines[i + 1]?.[pair])}   ·`);
   if (lines.length < 4) texts.push('RECORDING A QUOTE EVERY 10 MINUTES   ·');
   // Each half of the loop must be wider than the screen, or a gap shows.
   while (texts.length < 4) texts.push(...texts);

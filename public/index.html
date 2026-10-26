@@ -80,7 +80,8 @@
           <span class="crown-hint press" id="crown-hint" hidden>◂ PRESS TO WIND</span>
         </div>
         <!-- Brass case; the face is drawn in SVG, scale and labels filled in by app.js. -->
-        <div class="case">
+        <!-- Tap the case to turn the watch over; the back is a circular chart recorder. -->
+        <div class="case" id="case" role="button" tabindex="0" aria-label="Turn the watch over to see the price chart">
           <svg class="face" viewBox="0 0 340 340" aria-hidden="true">
             <defs>
               <radialGradient id="g-face" cx=".32" cy=".26" r=".85">
@@ -149,7 +150,33 @@
             </g>
           </svg>
           <div class="flaps" id="flaps" role="img" aria-label="—"></div>
+          <!-- The back: a round chart turning once per span, pen at the top. The
+               bezel turns one way in clicks, showing the span through a
+               window at twelve. -->
+          <svg class="back" id="back" viewBox="0 0 340 340" aria-hidden="true">
+            <defs>
+              <clipPath id="b-clip"><circle cx="170" cy="170" r="143"></circle></clipPath>
+              <radialGradient id="b-glass" cx=".28" cy=".2" r=".55">
+                <stop offset="0" stop-color="#fff" stop-opacity=".2"></stop>
+                <stop offset="1" stop-color="#fff" stop-opacity="0"></stop>
+              </radialGradient>
+            </defs>
+            <circle cx="170" cy="170" r="166.5" class="knurl"></circle>
+            <circle cx="170" cy="170" r="163.5" class="bevel-light"></circle>
+            <circle cx="170" cy="170" r="155" class="bevel-dark"></circle>
+            <circle cx="170" cy="170" r="150" class="bevel-light"></circle>
+            <circle cx="170" cy="170" r="146.5" class="seat"></circle>
+            <g clip-path="url(#b-clip)">
+              <circle cx="170" cy="170" r="143" fill="url(#g-face)"></circle>
+              <rect x="27" y="27" width="286" height="286" filter="url(#g-grain)" opacity=".18"></rect>
+              <g id="polar"></g>
+              <circle cx="170" cy="170" r="143" fill="url(#g-edge)"></circle>
+              <circle cx="170" cy="170" r="143" fill="url(#b-glass)"></circle>
+            </g>
+            <g class="bezel" id="bezel"></g>
+          </svg>
         </div>
+        <span class="turn-hint press" id="turn-hint" hidden>TAP THE WATCH TO TURN IT OVER</span>
       </section>
 
       <!-- Each lamp shows its currency's zone, so the other one is visible without switching. -->

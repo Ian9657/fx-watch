@@ -206,6 +206,57 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   50% { opacity: 1; transform: translateX(3px); }
 }
 
+/* Turning over: the case spins about its vertical axis; front and back
+   each hide when facing away. */
+.gauge { perspective: 1400px; }
+.case { transform-style: preserve-3d; transition: transform .8s cubic-bezier(.45, .05, .25, 1); cursor: pointer; touch-action: pan-y; }
+.case.over { transform: rotateY(180deg); }
+.face, .flaps, .back { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.back { position: absolute; inset: 0; display: block; width: 100%; height: 100%; transform: rotateY(180deg); }
+.turn-hint {
+  margin-top: 10px;
+  font: 700 8.5px 'Cinzel', serif;
+  letter-spacing: .24em;
+  color: #a39c8a;
+  animation: hint 2.4s ease-in-out infinite;
+}
+.turn-hint[hidden] { display: none; }
+.turn-hint.still { animation: none; opacity: .8; }
+
+/* The back's round chart, made like the front: the same cream paper,
+   band colours, engraved brass and digit-window hub; violet ink. */
+.back .ring { fill: none; stroke: rgba(120,90,50,.12); stroke-width: .8; }
+.back .spoke { stroke: rgba(120,90,50,.14); stroke-width: .8; }
+.back .track { fill: none; stroke: #231c12; stroke-width: .7; }
+.back .tick { stroke: #231c12; stroke-width: .8; }
+.back .tick.major { stroke-width: 1.8; }
+.back .tick-label { font: 700 9.5px 'Cormorant Garamond', serif; fill: #2a2216; text-anchor: middle; dominant-baseline: middle; }
+.back .seam { stroke: #5c4f37; stroke-width: .8; stroke-dasharray: 2 2; }
+.back .seam-label { font: 700 7.5px 'Cinzel', serif; letter-spacing: 2px; fill: #3a3020; }
+.back .limit { fill: none; stroke-width: 1.8; }
+.back .limit.floor { stroke: #557d62; }
+.back .limit.ceiling { stroke: #a24a37; }
+.back .limit.off { stroke-dasharray: 3 2; }
+.back .limit-tag { font: 700 10px 'Cormorant Garamond', serif; text-anchor: middle; paint-order: stroke; stroke: #ece4d0; stroke-width: 3px; }
+.back .limit-tag.floor { fill: #3f6a4f; }
+.back .limit-tag.ceiling { fill: #8a3a2a; }
+.back .ink { fill: none; stroke: #43348a; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.back .nib { fill: #43348a; stroke: #f4eedf; stroke-width: .8; }
+.back .pen { fill: #8a6430; stroke: #4a3214; stroke-width: .6; }
+.back .hub { fill: #151617; stroke: rgba(80,62,34,.55); stroke-width: 2.5; }
+.back .hub-span { font: 700 8.5px 'Cinzel', serif; fill: #d8c9a3; text-anchor: middle; letter-spacing: 2.5px; }
+.back .hub-change { font: 700 17px 'Playfair Display', Georgia, serif; fill: #f0e2bd; text-anchor: middle; font-variant-numeric: lining-nums; }
+/* The bezel: brass like the front, turning anticlockwise in clicks, with
+   one window at twelve onto a disc printed with the spans, like a date
+   window. */
+.back .bezel-edge { fill: none; stroke: rgba(48,30,8,.55); stroke-width: .8; }
+.back .bezel-tick { stroke: #231c12; stroke-width: .8; }
+.back .bezel-mark { font: 700 8px 'Cinzel', serif; fill: #2a2216; text-anchor: middle; dominant-baseline: middle; letter-spacing: 1.5px; }
+.back .span-window { fill: #f1e7cf; }
+.back .span-window-shade { fill: none; stroke: rgba(40,25,5,.35); stroke-width: 2; }
+.back .span-window-rim { fill: none; stroke: rgba(80,62,34,.7); stroke-width: 1.2; }
+.back .bezel-grip { cursor: grab; }
+
 /* Brass case: turned (concentric) grain over a conic sheen, light from the top left */
 .case {
   position: relative;
@@ -489,6 +540,7 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5
   .tremble { animation: none; }
   .fall, .rise { animation-duration: 0s; }
   .sheet { animation: none; }
-  .tape-run, .tape-run .fresh { animation: none; }
+  .tape-run, .tape-run .fresh, .turn-hint { animation: none; }
+  .case { transition: none; }
   .wheel-col { transition: none; }
 }

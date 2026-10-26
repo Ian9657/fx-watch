@@ -1,14 +1,9 @@
 :root {
-  --navy: #12202b;
   --navy-deep: #0b151d;
-  --brass: #b8894a;
   --brass-light: #d9b06a;
   --cream: #efe6d2;
   --ink: #f3dfb4;
   --muted: #c9b896;
-  --line: #3a3424;
-  --buy: #2f6b4f;
-  --high: #b3342a;
   --error: #f08a7a;
   color-scheme: dark;
 }
@@ -288,7 +283,6 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .window { fill: #151617; stroke: rgba(0,0,0,.6); stroke-width: 3; }
 .window-rim { fill: none; stroke: rgba(80,62,34,.55); stroke-width: .7; }
 .pair-engrave { font: 700 11px 'Cinzel', serif; letter-spacing: 4px; fill: #3a3020; text-anchor: middle; }
-.serial { font: 500 6.5px 'Cinzel', serif; letter-spacing: 2.5px; fill: #7a6b4e; text-anchor: middle; }
 /* Letterpress: dark type on the enamel gets a light edge below it. */
 .face text { text-shadow: 0 1px 0 rgba(255,250,236,.75); }
 .face text.on-band { text-shadow: 0 -1px 0 rgba(0,0,0,.35); }

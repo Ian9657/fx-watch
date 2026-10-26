@@ -261,7 +261,7 @@ function render() {
   }
   renderStatus();
   drawTape();
-  drawChart();
+  if (turned()) drawChart(); // the back is redrawn when it's turned to
 }
 
 // The tape leads with the live quote when it's newer than the last recorded
@@ -515,6 +515,10 @@ let swiped = false, swipeX = null, dragging = false;
 // on the back, so the way back is never a guess.
 function turnOver() {
   const over = $('case').classList.toggle('over');
+  if (over) {
+    drawChart();
+    loadHistory().then(drawChart, () => {}); // a lock shows on the next refresh
+  }
   store.set('turned', '1');
   $('turn-hint').textContent = over ? 'TAP THE CHART TO TURN BACK' : 'TAP THE WATCH TO TURN IT OVER';
   $('turn-hint').classList.toggle('still', over);
@@ -599,7 +603,8 @@ async function refreshAll() {
   refreshing = true;
   $('refresh').disabled = true;
   try {
-    await Promise.all([loadSettings(), loadRates(), loadHistory()]);
+    // History (up to ~90 KB) is only fetched while the back is showing.
+    await Promise.all([loadSettings(), loadRates(), turned() ? loadHistory() : null]);
     unlock();
     showError('');
     render();

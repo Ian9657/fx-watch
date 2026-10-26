@@ -7,7 +7,7 @@ Live at **[fx.etarc.net](https://fx.etarc.net)**. Works on iPhone and Mac as a h
 ## What it does
 
 - Shows the CITIC customer buy price (客户购汇价) for GBP→CNY and USD→CNY, refreshed every 30 seconds while open
-- Checks both prices every 10 minutes. Each currency can have a floor (alert when the price drops below it) and a ceiling (alert when it rises above it). Each side alerts once, then re-arms when the price is back inside
+- Checks both prices every 10 minutes. Each currency can have a floor (alert when the price drops below it) and a ceiling (alert when it rises above it). Each side alerts once, then re-arms only when the price is back inside by more than 0.1%, so a price wobbling around a limit doesn't alert repeatedly
 - Shows the change since yesterday's last price, and a ticker tape of the last few quotes (CITIC publishes no history, so the Worker records both)
 - Private: the app asks for a password once per device; without it the API returns nothing
 - Floors and ceilings are set with number wheels in the app (drag or tap each digit); the dial previews the change before you save

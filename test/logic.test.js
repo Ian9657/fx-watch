@@ -21,17 +21,31 @@ test('alerts once when a rate rises above its ceiling', () => {
   assert.equal(evaluate({ GBP: 9.2 }, limits({ ceiling: 9.0 }), first.alerted).alerts.length, 0);
 });
 
-test('re-arms only when the rate is strictly back inside the limit', () => {
+test('re-arms only once the rate is back inside the limit by the margin', () => {
   const l = limits({ floor: 8.9, ceiling: 9.1 });
   const both = { GBP: { floor: true, ceiling: true }, USD: { floor: false, ceiling: false } };
-  // Equal to a limit keeps that side quiet.
+  // Equal to a limit, or back inside by less than 0.1%, keeps that side quiet.
   assert.equal(evaluate({ GBP: 8.9 }, l, both).alerted.GBP.floor, true);
+  assert.equal(evaluate({ GBP: 8.905 }, l, both).alerted.GBP.floor, true);
   assert.equal(evaluate({ GBP: 9.1 }, l, both).alerted.GBP.ceiling, true);
-  // Strictly inside re-arms both sides, so the next crossing alerts again.
+  assert.equal(evaluate({ GBP: 9.095 }, l, both).alerted.GBP.ceiling, true);
+  // Well inside re-arms both sides, so the next crossing alerts again.
   const rearmed = evaluate({ GBP: 9.0 }, l, both).alerted;
   assert.deepEqual(rearmed.GBP, { floor: false, ceiling: false });
   assert.equal(evaluate({ GBP: 8.8 }, l, rearmed).alerts[0].side, 'floor');
   assert.equal(evaluate({ GBP: 9.2 }, l, rearmed).alerts[0].side, 'ceiling');
+});
+
+test('a price wobbling around the floor alerts only once', () => {
+  const l = limits({ floor: 8.9 });
+  let state = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
+  let sent = 0;
+  for (const rate of [8.899, 8.901, 8.898, 8.903, 8.897, 8.902]) {
+    const r = evaluate({ GBP: rate }, l, state);
+    sent += r.alerts.length;
+    state = r.alerted;
+  }
+  assert.equal(sent, 1);
 });
 
 test('migrates settings saved before ceilings existed', () => {

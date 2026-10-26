@@ -61,9 +61,17 @@ export function migrate(data) {
 
 const crossed = (side, rate, limit) => side === 'floor' ? rate < limit : rate > limit;
 
+// A side re-arms only once the rate is back inside its limit by this
+// fraction, so a price wobbling around the floor doesn't alert again and
+// again. 0.1% is about 0.009 on GBP/CNY, roughly a quarter of a quiet day.
+export const REARM = 0.001;
+
+const rearmed = (side, rate, limit) =>
+  side === 'floor' ? rate > limit * (1 + REARM) : rate < limit * (1 - REARM);
+
 // Decide which alerts to send. Each side alerts once when the rate crosses
-// its limit (below a floor, above a ceiling), then stays quiet until the rate
-// is strictly back on the other side. Equal to the limit changes nothing.
+// its limit (below a floor, above a ceiling), then stays quiet until the
+// rate is back inside the limit by more than REARM.
 export function evaluate(rates, limits, alerted) {
   const next = {};
   const alerts = [];
@@ -77,7 +85,7 @@ export function evaluate(rates, limits, alerted) {
       } else if (crossed(side, rate, limit)) {
         if (!alerted[pair]?.[side]) alerts.push({ pair, side, rate, limit });
         next[pair][side] = true;
-      } else if (rate !== limit) {
+      } else if (rearmed(side, rate, limit)) {
         next[pair][side] = false;
       }
     }

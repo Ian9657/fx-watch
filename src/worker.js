@@ -87,6 +87,10 @@ async function api(request, env, path) {
     return json(Object.fromEntries(PAIRS.map(p => [p, { ...quotes[p], previousClose: prev?.[p] ?? null }])));
   }
 
+  if (path === '/api/history') {
+    return json({ history: (await env.STORE.get('history', 'json')) || [] });
+  }
+
   if (path === '/api/settings' && request.method === 'GET') {
     const [{ limits, lastCheck }, tape] = await Promise.all([load(env), env.STORE.get('tape', 'json')]);
     return json({ limits, lastCheck, tape: tape || [] });

@@ -1,4 +1,4 @@
-import { PAIRS, SIDES, parseCitic, appendTape, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage } from './logic.js';
+import { PAIRS, SIDES, parseCitic, appendTape, appendHistory, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage } from './logic.js';
 
 async function load(env) {
   return { lastCheck: null, ...migrate((await env.STORE.get('data', 'json')) || {}) };
@@ -18,14 +18,16 @@ async function fetchCitic() {
 }
 
 // Keep the last price of each Beijing day (for the change vs. yesterday)
-// and the last few quotes (for the ticker tape).
+// the last few quotes (for the ticker tape) and every quote for 90 days
+// (for the chart).
 async function record(env, quotes) {
   const t = Math.max(...PAIRS.map(p => quotes[p].time));
   const sample = { t, ...Object.fromEntries(PAIRS.map(p => [p, quotes[p].price])) };
   const day = beijingDay(t * 1000);
-  const [daily, tape] = await Promise.all([
+  const [daily, tape, history] = await Promise.all([
     env.STORE.get('daily', 'json').then(v => v || []),
     env.STORE.get('tape', 'json').then(v => v || []),
+    env.STORE.get('history', 'json').then(v => v || []),
   ]);
   if (daily.at(-1)?.t === t) return;
   const next = daily.filter(d => d.d !== day);
@@ -33,6 +35,7 @@ async function record(env, quotes) {
   await Promise.all([
     env.STORE.put('daily', JSON.stringify(next.slice(-30))),
     env.STORE.put('tape', JSON.stringify(appendTape(tape, sample))),
+    env.STORE.put('history', JSON.stringify(appendHistory(history, sample))),
   ]);
 }
 

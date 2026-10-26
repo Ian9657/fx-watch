@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, appendTape, TAPE_LENGTH, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage } from '../src/logic.js';
+import { parseCitic, appendTape, TAPE_LENGTH, appendHistory, HISTORY_DAYS, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage } from '../src/logic.js';
 
 const none = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
 const limits = (gbp, usd = {}) => ({
@@ -103,4 +103,15 @@ test('ticker tape keeps the newest quotes first and skips repeats', () => {
   for (let t = 3; t < 30; t++) tape = appendTape(tape, { t });
   assert.equal(tape.length, TAPE_LENGTH);
   assert.equal(tape[0].t, 29);
+});
+
+test('price history keeps every new quote for 90 days, oldest first', () => {
+  const day = 86400;
+  let history = [];
+  history = appendHistory(history, { t: day, GBP: 8.9, USD: 7.1 });
+  history = appendHistory(history, { t: day, GBP: 8.9, USD: 7.1 });
+  history = appendHistory(history, { t: 2 * day, GBP: 8.91, USD: 7.12 });
+  assert.deepEqual(history, [[day, 8.9, 7.1], [2 * day, 8.91, 7.12]]);
+  history = appendHistory(history, { t: (HISTORY_DAYS + 1.5) * day, GBP: 9, USD: 7.2 });
+  assert.deepEqual(history.map(row => row[0]), [2 * day, (HISTORY_DAYS + 1.5) * day]);
 });

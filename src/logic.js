@@ -35,6 +35,16 @@ export function appendTape(tape, sample) {
   return [sample, ...tape].slice(0, TAPE_LENGTH);
 }
 
+// Price history for the chart: one [t, GBP, USD] row per new quote, oldest
+// first, kept for HISTORY_DAYS. Short rows and 4-decimal prices keep 90 days
+// small (about 0.5 MB).
+export const HISTORY_DAYS = 90;
+export function appendHistory(history, sample) {
+  if (history.at(-1)?.[0] === sample.t) return history;
+  const cutoff = sample.t - HISTORY_DAYS * 86400;
+  return [...history.filter(row => row[0] > cutoff), [sample.t, ...PAIRS.map(p => +sample[p].toFixed(4))]];
+}
+
 // Beijing calendar date (YYYY-MM-DD) for an epoch-ms timestamp.
 export function beijingDay(ms) {
   return new Date(ms + BEIJING).toISOString().slice(0, 10);

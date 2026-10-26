@@ -215,7 +215,7 @@ function drawFlaps(text) {
 function render() {
   for (const p of PAIRS) {
     // Lamps track every currency, so the one not on the dial still shows its zone.
-    const zone = rates[p] && !feedError ? zoneOf(rates[p].price, limits[p]) : '';
+    const zone = rates[p] && !feedError ? zoneOf(rates[p].price, limitsFor(p)) : '';
     $(`lamp-${p}`).className = `lamp-dot ${zone}`;
     document.querySelector(`.pick[data-pair="${p}"]`).setAttribute('aria-pressed', String(p === pair));
     document.querySelector(`.pick[data-pair="${p}"]`).setAttribute('aria-label', `${p}${zone ? `, ${zone === 'high' ? 'too high' : zone}` : ''}`);
@@ -224,7 +224,7 @@ function render() {
   $('pair-label').textContent = `${pair} → CNY`;
 
   const r = rates[pair];
-  const l = limits[pair];
+  const l = limitsFor(pair);
   const noFloor = l.floor == null;
   const noCeiling = l.ceiling == null;
   const gauge = $('gauge');
@@ -282,12 +282,10 @@ async function loadRates() {
   }
 }
 
-let editing = false; // don't overwrite inputs while the settings panel is open
 async function loadSettings() {
   let check;
   ({ limits, lastCheck: check } = await getJSON('/api/settings'));
   lastCheck = check?.time ?? null;
-  if (!editing) for (const p of PAIRS) for (const side of SIDES) $(`${side}-input-${p}`).value = limits[p][side] ?? '';
 }
 
 let refreshing = false;
@@ -320,24 +318,137 @@ $('lock').addEventListener('submit', async e => {
   await refreshAll();
 });
 
-$('toggle-settings').addEventListener('click', () => {
-  const open = $('settings').hidden;
-  $('settings').hidden = !open;
-  editing = open;
-  $('toggle-settings').setAttribute('aria-expanded', String(open));
-  $('toggle-settings').textContent = open ? 'CLOSE' : 'SET FLOOR & CEILING';
-});
+// ---- Settings sheet: number wheels -------------------------------------
+// While the sheet is open the dial previews the draft, so you can see where
+// a new floor or ceiling would sit before saving.
+let draft = null; // { floor: { on, text }, ceiling: { on, text } } for `pair`
+const wheelCols = { floor: [], ceiling: [] };
+
+function draftLimits() {
+  return Object.fromEntries(SIDES.map(side => [side, draft[side].on ? Number(draft[side].text) : null]));
+}
+const crossed = ({ floor, ceiling }) => floor != null && ceiling != null && floor >= ceiling;
+
+// The dial previews the draft, unless the draft has floor above ceiling.
+function limitsFor(p) {
+  if (!draft || p !== pair || crossed(draftLimits())) return limits[p];
+  return draftLimits();
+}
+
+const DIGIT_H = 32;
+const colOffset = d => `translateY(${12 - d * DIGIT_H}px)`;
+
+function setDigit(side, i, delta) {
+  const chars = [...draft[side].text];
+  chars[i] = String((Number(chars[i]) + delta + 10) % 10);
+  draft[side].text = chars.join('');
+  const wheel = wheelCols[side][i];
+  wheel.col.style.transform = colOffset(Number(chars[i]));
+  wheel.el.setAttribute('aria-valuenow', chars[i]);
+  if (!draft[side].on) toggleSide(side);
+  sheetChanged();
+}
+
+// Drag up to turn a wheel forward, down to turn it back; a tap on the top
+// half adds one, on the bottom half takes one away.
+function makeWheel(side, i, digit) {
+  const el = document.createElement('div');
+  el.className = 'wheel';
+  el.tabIndex = 0;
+  el.setAttribute('role', 'spinbutton');
+  el.setAttribute('aria-valuemin', '0');
+  el.setAttribute('aria-valuemax', '9');
+  el.setAttribute('aria-valuenow', digit);
+  el.setAttribute('aria-label', `${side} digit ${i + 1}`);
+  const col = document.createElement('div');
+  col.className = 'wheel-col';
+  col.append(...Array.from({ length: 10 }, (_, n) => Object.assign(document.createElement('span'), { textContent: n })));
+  col.style.transform = colOffset(Number(digit));
+  el.append(col);
+  wheelCols[side][i] = { el, col };
+
+  let startY = 0, lastY = 0, moved = false;
+  el.addEventListener('pointerdown', e => {
+    el.setPointerCapture(e.pointerId);
+    startY = lastY = e.clientY;
+    moved = false;
+  });
+  el.addEventListener('pointermove', e => {
+    if (!el.hasPointerCapture(e.pointerId)) return;
+    if (Math.abs(e.clientY - startY) > 6) moved = true;
+    while (lastY - e.clientY >= 24) { setDigit(side, i, 1); lastY -= 24; }
+    while (e.clientY - lastY >= 24) { setDigit(side, i, -1); lastY += 24; }
+  });
+  el.addEventListener('pointerup', e => {
+    if (moved) return;
+    const box = el.getBoundingClientRect();
+    setDigit(side, i, e.clientY < box.top + box.height / 2 ? 1 : -1);
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'ArrowUp') { e.preventDefault(); setDigit(side, i, 1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setDigit(side, i, -1); }
+  });
+  return el;
+}
+
+function toggleSide(side) {
+  draft[side].on = !draft[side].on;
+  $(`toggle-${side}`).setAttribute('aria-pressed', String(draft[side].on));
+  $(`toggle-${side}`).textContent = draft[side].on ? 'ON' : 'OFF';
+  $(`row-${side}`).classList.toggle('off', !draft[side].on);
+  sheetChanged();
+}
+
+function sheetChanged() {
+  const bad = crossed(draftLimits());
+  $('sheet-note').textContent = bad
+    ? 'Floor must be lower than ceiling.'
+    : 'A Telegram message when the price drops below the floor or rises above the ceiling.';
+  $('sheet-note').classList.toggle('bad', bad);
+  $('form-status').textContent = '';
+  render();
+}
+
+function openSheet() {
+  // A limit that's off starts from the current price, ready to dial in.
+  const start = (rates[pair]?.price ?? 1).toFixed(4);
+  draft = Object.fromEntries(SIDES.map(side => {
+    const v = limits[pair][side];
+    return [side, { on: v != null, text: v != null ? v.toFixed(4) : start }];
+  }));
+  $('sheet-title').textContent = `SET ${pair} LIMITS`;
+  for (const side of SIDES) {
+    $(`wheels-${side}`).replaceChildren(...[...draft[side].text].map((ch, i) => {
+      if (ch === '.') return Object.assign(document.createElement('span'), { className: 'wheel-dot' });
+      return makeWheel(side, i, ch);
+    }));
+    draft[side].on = !draft[side].on; // toggleSide flips it back and syncs the button
+    toggleSide(side);
+  }
+  $('sheet-backdrop').hidden = false;
+  $('settings').hidden = false;
+  $('wheels-floor').querySelector('.wheel').focus({ preventScroll: true });
+}
+
+function closeSheet() {
+  draft = null;
+  $('settings').hidden = true;
+  $('sheet-backdrop').hidden = true;
+  render();
+  $('toggle-settings').focus({ preventScroll: true });
+}
+
+$('toggle-settings').addEventListener('click', openSheet);
+$('sheet-close').addEventListener('click', closeSheet);
+$('sheet-backdrop').addEventListener('click', closeSheet);
+$('toggle-floor').addEventListener('click', () => toggleSide('floor'));
+$('toggle-ceiling').addEventListener('click', () => toggleSide('ceiling'));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && draft) closeSheet(); });
 
 $('settings').addEventListener('submit', async e => {
   e.preventDefault();
-  const next = {};
-  for (const p of PAIRS) {
-    next[p] = {};
-    for (const side of SIDES) {
-      const raw = $(`${side}-input-${p}`).value.trim();
-      next[p][side] = raw === '' ? null : Number(raw);
-    }
-  }
+  if (crossed(draftLimits())) return;
+  const next = { ...limits, [pair]: draftLimits() };
   $('form-status').textContent = 'Saving…';
   try {
     ({ limits } = await getJSON('/api/settings', {
@@ -345,8 +456,7 @@ $('settings').addEventListener('submit', async e => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ limits: next }),
     }));
-    $('form-status').textContent = 'Saved.';
-    render();
+    closeSheet();
   } catch (err) {
     if (err instanceof Locked) return lock('Enter your password again.');
     $('form-status').textContent = err.message;

@@ -164,23 +164,33 @@
         </button>
       </div>
 
-      <button id="toggle-settings" class="btn press" aria-expanded="false" aria-controls="settings">Set floor &amp; ceiling</button>
-
-      <form id="settings" class="settings" hidden>
-        <p class="note">A Telegram message when a price drops below its floor or rises above its ceiling. Leave empty to turn off.</p>
-        <div class="limit-grid">
-          <span></span><span class="caps small">FLOOR</span><span class="caps small">CEILING</span>
-          <span class="caps">GBP</span>
-          <input id="floor-input-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="GBP floor">
-          <input id="ceiling-input-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="GBP ceiling">
-          <span class="caps">USD</span>
-          <input id="floor-input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD floor">
-          <input id="ceiling-input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD ceiling">
-        </div>
-        <button type="submit" class="btn press">SAVE</button>
-        <p class="note"><span id="form-status" role="status"></span> <button type="button" id="test" class="link">Send a test message</button></p>
-      </form>
+      <button id="toggle-settings" class="btn press" aria-haspopup="dialog" aria-controls="settings">Set floor &amp; ceiling</button>
     </div>
+
+    <!-- Settings slide up from the bottom: one row of number wheels per limit. -->
+    <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+    <form id="settings" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+      <div class="sheet-head">
+        <h2 id="sheet-title" class="press">SET GBP LIMITS</h2>
+        <span class="sheet-hint press">drag or tap a wheel</span>
+      </div>
+      <div class="wheel-row" id="row-floor">
+        <span class="row-label caps press">FLOOR</span>
+        <div class="wheels" id="wheels-floor"></div>
+        <button type="button" class="toggle press" id="toggle-floor" aria-pressed="true" aria-label="Floor alert">ON</button>
+      </div>
+      <div class="wheel-row" id="row-ceiling">
+        <span class="row-label caps press">CEILING</span>
+        <div class="wheels" id="wheels-ceiling"></div>
+        <button type="button" class="toggle press" id="toggle-ceiling" aria-pressed="true" aria-label="Ceiling alert">ON</button>
+      </div>
+      <p class="note press" id="sheet-note">A Telegram message when the price drops below the floor or rises above the ceiling.</p>
+      <div class="sheet-actions">
+        <button type="button" class="btn press" id="sheet-close">Close</button>
+        <button type="submit" class="btn btn-strong press">Save</button>
+      </div>
+      <p class="note press"><span id="form-status" role="status"></span> <button type="button" id="test" class="link">Send a test message</button></p>
+    </form>
 
     <footer class="caps small press">CITIC BANK CUSTOMER BUY PRICE · FOR REFERENCE</footer>
   </main>

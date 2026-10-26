@@ -10,7 +10,7 @@ Live at **[fx.etarc.net](https://fx.etarc.net)**. Works on iPhone and Mac as a h
 - Checks both prices every 10 minutes. Each currency can have a floor (alert when the price drops below it) and a ceiling (alert when it rises above it). Each side alerts once, then re-arms when the price is back inside
 - Shows the change since yesterday's last price (CITIC publishes no history, so the Worker records it)
 - Private: the app asks for a password once per device; without it the API returns nothing
-- Floors and ceilings are edited in the app
+- Floors and ceilings are set with number wheels in the app (drag or tap each digit); the dial previews the change before you save
 
 Prices come from the feed behind the public rate table on citicbank.com. They are for reference only; the price in the CITIC app when you trade is final.
 

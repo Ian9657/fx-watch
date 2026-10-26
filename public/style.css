@@ -352,16 +352,90 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   box-shadow: 1px 0 0 rgba(255,255,255,.45);
 }
 
-/* Settings */
-.settings { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid #5c4a2c; border-radius: 6px; }
-.settings[hidden] { display: none; }
-.limit-grid {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px 10px;
-  align-items: center;
+/* Settings sheet: slides up from the bottom, number wheels for each limit */
+.sheet-backdrop { position: fixed; inset: 0; z-index: 10; background: rgba(4,7,10,.6); }
+.sheet-backdrop[hidden] { display: none; }
+.sheet {
+  position: fixed;
+  z-index: 11;
+  left: 50%;
+  bottom: 0;
+  width: min(440px, 100%);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px max(20px, env(safe-area-inset-bottom));
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px), linear-gradient(#1d2730, #141c23);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 -1px 0 #05080b, 0 -10px 24px rgba(0,0,0,.55);
+  animation: sheet-up .35s cubic-bezier(.2, .9, .3, 1) both;
 }
-.limit-grid .small { text-align: right; padding-right: 12px; }
+.sheet[hidden] { display: none; }
+@keyframes sheet-up { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+.sheet-head { display: flex; justify-content: space-between; align-items: baseline; }
+.sheet-head h2 { font-size: 13px; color: #d8cfb8; letter-spacing: 0.24em; }
+.sheet-hint { font-size: 13px; color: #7d7768; }
+.sheet .note { text-align: left; }
+.sheet .note.bad { color: var(--error); }
+.sheet-actions { display: flex; gap: 10px; }
+.btn-strong { background: linear-gradient(#2f3c47, #1f2830); color: #e9e1cc; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 0 0 1px #05080b; }
+
+.wheel-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row-label { width: 64px; font-size: 11px; color: #a39c8a; letter-spacing: 0.2em; }
+.wheels {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: #0b1014;
+  box-shadow: inset 0 2px 3px #000, 0 1px 0 rgba(255,255,255,.06);
+  transition: opacity .2s;
+}
+.wheel-row.off .wheels { opacity: .3; }
+/* A drum with ten digits; only the middle one shows fully, the curve darkens the rest. */
+.wheel {
+  position: relative;
+  width: 30px;
+  height: 56px;
+  overflow: hidden;
+  touch-action: none;
+  cursor: ns-resize;
+  background: linear-gradient(#cfc5ad, #f2ead6 30%, #f6efdd 50%, #f2ead6 70%, #c6bba1);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.5);
+}
+.wheel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(rgba(20,14,6,.55), rgba(20,14,6,0) 32%, rgba(20,14,6,0) 68%, rgba(20,14,6,.55));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
+}
+.wheel:focus-visible { outline: 2px solid var(--brass-light); outline-offset: 1px; }
+.wheel-col { position: absolute; left: 0; right: 0; top: 0; transition: transform .3s cubic-bezier(.3, 1.3, .5, 1); }
+.wheel-col span {
+  display: block;
+  height: 32px;
+  line-height: 32px;
+  text-align: center;
+  font: 700 22px 'Playfair Display', Georgia, serif;
+  font-variant-numeric: lining-nums;
+  color: #231c12;
+}
+.wheel-dot { width: 4px; height: 4px; margin: 0 2px; border-radius: 50%; background: #c9a160; }
+.toggle {
+  width: 52px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: linear-gradient(#202a33, #161e25);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 1px #05080b;
+  color: #6b6556;
+  font: 700 10px 'Cinzel', serif;
+  letter-spacing: 0.2em;
+}
+.toggle[aria-pressed="true"] { color: #7cc29d; }
 
 #toggle-settings { margin-top: auto; }
 footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5a4e; letter-spacing: 0.2em; }
@@ -370,4 +444,6 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5
   .needle, .knob-cap { transition: none; }
   .tremble { animation: none; }
   .fall, .rise { animation-duration: 0s; }
+  .sheet { animation: none; }
+  .wheel-col { transition: none; }
 }

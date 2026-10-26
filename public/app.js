@@ -10,6 +10,12 @@ const store = {
 
 let rates = {};
 let limits = { GBP: { floor: null, ceiling: null }, USD: { floor: null, ceiling: null } };
+let lastCheck = null;  // when the 10-minute alert check last ran (epoch ms)
+let lastGood = null;   // when this page last loaded prices successfully
+let feedError = null;  // message if the latest price load failed
+
+const QUOTE_STALE_MIN = 60;  // CITIC normally re-quotes every few minutes
+const CHECK_STALE_MIN = 25;  // the alert check runs every 10 minutes
 const shown = {}; // last digits drawn per pair, so only changed flaps flip
 
 const time = (date, seconds = false) => date.toLocaleTimeString('en-GB', {
@@ -49,12 +55,42 @@ function unlock() {
   $('refresh').hidden = false;
 }
 
+const minutesAgo = ms => (Date.now() - ms) / 60000;
+
+// One line that says whether the prices and the alert check can be trusted.
+function renderStatus() {
+  const quoteTime = Math.max(0, ...Object.values(rates).map(r => r.time * 1000));
+  let level = 'ok';
+  let text = 'LIVE';
+  if (feedError) {
+    level = 'error';
+    text = lastGood ? `CITIC FEED ERROR · PRICES FROM ${time(new Date(lastGood))}` : 'CITIC FEED ERROR';
+  } else if (quoteTime && minutesAgo(quoteTime) > QUOTE_STALE_MIN) {
+    level = 'warn';
+    text = `NO NEW QUOTE SINCE ${time(new Date(quoteTime))}`;
+  }
+  if (!lastCheck) {
+    if (level === 'ok') level = 'warn';
+    text += ' · ALERTS NOT CHECKED YET';
+  } else if (minutesAgo(lastCheck) > CHECK_STALE_MIN) {
+    if (level === 'ok') level = 'warn';
+    text += ` · ALERTS LAST CHECKED ${time(new Date(lastCheck))}`;
+  } else {
+    text += ` · ALERTS CHECKED ${time(new Date(lastCheck))}`;
+  }
+  $('refresh').className = `status ${level}`;
+  $('status-text').textContent = text;
+  $('refresh').title = feedError || '';
+}
+
 // Where the needle sits, 0 (far left) to 1 (far right). The floor is drawn
 // at 0.3 and the ceiling at 0.7, so the HOLD band is the range you set.
+// With one side off, a 1% span stands in for the missing limit only to scale
+// the needle; that side's band is shown as OFF and never alerts.
 function position(price, floor, ceiling) {
   if (floor == null && ceiling == null) return 0.5;
-  const lo = floor ?? ceiling * 0.98;
-  const hi = ceiling ?? floor * 1.02;
+  const lo = floor ?? ceiling * 0.99;
+  const hi = ceiling ?? floor * 1.01;
   const pos = 0.3 + (0.4 * (price - lo)) / (hi - lo);
   return Math.min(0.97, Math.max(0.03, pos));
 }
@@ -93,10 +129,17 @@ function render() {
     const r = rates[p];
     const l = limits[p];
     const gauge = document.querySelector(`.gauge[data-pair="${p}"]`);
-    gauge.classList.toggle('unset', l.floor == null && l.ceiling == null);
+    const noFloor = l.floor == null;
+    const noCeiling = l.ceiling == null;
+    gauge.classList.toggle('no-floor', noFloor);
+    gauge.classList.toggle('no-ceiling', noCeiling);
+    gauge.classList.toggle('stale', !!feedError);
     if ($(`floor-${p}`)) {
-      $(`floor-${p}`).textContent = `Floor ${l.floor?.toFixed(4) ?? '—'}`;
-      $(`ceiling-${p}`).textContent = `Ceiling ${l.ceiling?.toFixed(4) ?? '—'}`;
+      $(`floor-${p}`).textContent = noFloor ? 'Floor off' : `Floor ${l.floor.toFixed(4)}`;
+      $(`ceiling-${p}`).textContent = noCeiling ? 'Ceiling off' : `Ceiling ${l.ceiling.toFixed(4)}`;
+      $(`label-floor-${p}`).textContent = noFloor ? 'OFF' : 'BUY';
+      $(`label-ceiling-${p}`).textContent = noCeiling ? 'OFF' : 'TOO HIGH';
+      $(`label-hold-${p}`).textContent = noFloor && noCeiling ? 'ALERTS OFF' : 'HOLD';
     }
     if (!r) continue;
 
@@ -105,10 +148,14 @@ function render() {
     drawFlaps(p, r.price.toFixed(4));
 
     const zone = zoneOf(r.price, l);
-    $(`zone-${p}`).textContent = { buy: '· BUY', high: '· TOO HIGH', hold: '· HOLD' }[zone] || '';
-    $(`zone-${p}`).className = `zone ${zone}`;
+    // An old price must not read as a current BUY/HOLD call.
+    $(`zone-${p}`).textContent = feedError ? '· STALE'
+      : { buy: '· BUY', high: '· TOO HIGH', hold: '· HOLD' }[zone] || '· ALERTS OFF';
+    $(`zone-${p}`).className = `zone ${feedError ? '' : zone}`;
 
     const parts = [distance(r.price, l)];
+    // The small dial has no floor/ceiling row, so say which side is off.
+    if (!$(`floor-${p}`) && noFloor !== noCeiling) parts.push(noFloor ? 'floor off' : 'ceiling off');
     if (r.previousClose) {
       const pct = ((r.price - r.previousClose) / r.previousClose) * 100;
       parts.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% today`);
@@ -116,25 +163,35 @@ function render() {
     parts.push(`quoted ${time(new Date(r.time * 1000))}`);
     $(`note-${p}`).textContent = parts.join(' · ');
   }
+  renderStatus();
 }
 
 async function loadRates() {
-  rates = await getJSON('/api/rates');
-  $('updated').textContent = time(new Date(), true);
+  try {
+    rates = await getJSON('/api/rates');
+    lastGood = Date.now();
+    feedError = null;
+  } catch (err) {
+    if (err instanceof Locked) throw err;
+    feedError = err.message; // keep the last prices on screen, marked as old
+  }
 }
 
+let editing = false; // don't overwrite inputs while the settings panel is open
 async function loadSettings() {
-  ({ limits } = await getJSON('/api/settings'));
-  for (const p of PAIRS) for (const side of SIDES) $(`${side}-input-${p}`).value = limits[p][side] ?? '';
+  let check;
+  ({ limits, lastCheck: check } = await getJSON('/api/settings'));
+  lastCheck = check?.time ?? null;
+  if (!editing) for (const p of PAIRS) for (const side of SIDES) $(`${side}-input-${p}`).value = limits[p][side] ?? '';
 }
 
 let refreshing = false;
-async function refreshAll(onlyRates = false) {
+async function refreshAll() {
   if (refreshing || !store.get('password')) return;
   refreshing = true;
   $('refresh').disabled = true;
   try {
-    await Promise.all(onlyRates ? [loadRates()] : [loadSettings(), loadRates()]);
+    await Promise.all([loadSettings(), loadRates()]);
     unlock();
     showError('');
     render();
@@ -161,6 +218,7 @@ $('lock').addEventListener('submit', async e => {
 $('toggle-settings').addEventListener('click', () => {
   const open = $('settings').hidden;
   $('settings').hidden = !open;
+  editing = open;
   $('toggle-settings').setAttribute('aria-expanded', String(open));
   $('toggle-settings').textContent = open ? 'CLOSE' : 'SET FLOOR & CEILING';
 });
@@ -205,7 +263,7 @@ $('refresh').addEventListener('click', () => refreshAll());
 
 // Home-screen apps have no reload button and iOS freezes them in the
 // background, so refresh on a timer and whenever the app comes back.
-setInterval(() => { if (!document.hidden) refreshAll(true); }, 30_000);
+setInterval(() => { if (!document.hidden) refreshAll(); }, 30_000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAll(); });
 window.addEventListener('pageshow', e => { if (e.persisted) refreshAll(); });
 window.addEventListener('focus', () => refreshAll());

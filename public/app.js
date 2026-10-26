@@ -84,16 +84,65 @@ function renderStatus() {
   $('refresh').title = feedError || '';
 }
 
-// Where the needle sits, 0 (far left) to 1 (far right). The floor is drawn
-// at 0.3 and the ceiling at 0.7, so the HOLD band is the range you set.
-// With one side off, a 1% span stands in for the missing limit only to scale
-// the needle; that side's band is shown as OFF and never alerts.
+// The dial maps a price range onto a half circle, 0 (far left) to 1 (far
+// right). The floor sits at 0.3 and the ceiling at 0.7, so the HOLD band is
+// the range you set. With one side off, a 1% span stands in for the missing
+// limit only to scale the dial; that side's band reads OFF and never alerts.
+function span(price, floor, ceiling) {
+  if (floor == null && ceiling == null) return [price * 0.995, price * 1.005];
+  return [floor ?? ceiling * 0.99, ceiling ?? floor * 1.01];
+}
+
 function position(price, floor, ceiling) {
-  if (floor == null && ceiling == null) return 0.5;
-  const lo = floor ?? ceiling * 0.99;
-  const hi = ceiling ?? floor * 1.01;
+  const [lo, hi] = span(price, floor, ceiling);
   const pos = 0.3 + (0.4 * (price - lo)) / (hi - lo);
-  return Math.min(0.97, Math.max(0.03, pos));
+  return Math.min(0.98, Math.max(0.02, pos));
+}
+
+const SVG = 'http://www.w3.org/2000/svg';
+const point = (pos, r) => {
+  const a = Math.PI * (1 - pos);
+  return [170 + r * Math.cos(a), 170 - r * Math.sin(a)];
+};
+const arc = (a, b, r) => {
+  const [x1, y1] = point(a, r);
+  const [x2, y2] = point(b, r);
+  return `M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 0 1 ${x2.toFixed(2)},${y2.toFixed(2)}`;
+};
+function svgEl(tag, attrs, text) {
+  const el = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  if (text) el.textContent = text;
+  return el;
+}
+
+// Parts of the face that never change: bands, 61 ticks, floor/ceiling markers.
+function buildFace() {
+  const bands = { buy: [0.003, 0.3], hold: [0.3, 0.7], high: [0.7, 0.997] };
+  for (const [name, [a, b]] of Object.entries(bands)) {
+    $(`band-${name}`).setAttribute('d', arc(a, b, 117));
+    $(`path-${name}`).setAttribute('d', arc(a, b, 114.5));
+  }
+  $('ticks').replaceChildren(...Array.from({ length: 61 }, (_, i) => {
+    const major = i % 5 === 0;
+    const [x1, y1] = point(i / 60, 140);
+    const [x2, y2] = point(i / 60, major ? 129 : 134);
+    return svgEl('line', { x1, y1, x2, y2, 'stroke-width': major ? 1.6 : 0.7 });
+  }));
+  $('markers').replaceChildren(...[0.3, 0.7].map(pos => {
+    const pts = [point(pos, 128), point(pos - 0.013, 120), point(pos + 0.013, 120)];
+    return svgEl('polygon', { points: pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ') });
+  }));
+}
+
+// Printed prices around the scale, every other major tick.
+function drawScale(price, { floor, ceiling }) {
+  const [lo, hi] = span(price, floor, ceiling);
+  $('scale').replaceChildren(...Array.from({ length: 7 }, (_, k) => {
+    const pos = k / 6;
+    const [x, y] = point(pos, 98);
+    return svgEl('text', { x: x.toFixed(1), y: (y + 3).toFixed(1) }, (lo + ((pos - 0.3) / 0.4) * (hi - lo)).toFixed(3));
+  }));
 }
 
 function zoneOf(price, { floor, ceiling }) {
@@ -153,6 +202,7 @@ function render() {
   if (r) {
     const deg = position(r.price, l.floor, l.ceiling) * 180 - 90;
     $('needle').style.transform = `rotate(${deg}deg)`;
+    drawScale(r.price, l);
     drawFlaps(r.price.toFixed(4));
 
     const zone = zoneOf(r.price, l);
@@ -284,5 +334,6 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) refr
 window.addEventListener('pageshow', e => { if (e.persisted) refreshAll(); });
 window.addEventListener('focus', () => refreshAll());
 
+buildFace();
 if (store.get('password')) refreshAll();
 else lock();

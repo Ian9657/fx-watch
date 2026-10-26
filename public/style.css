@@ -129,35 +129,67 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 #app { display: flex; flex-direction: column; gap: 16px; }
 #app[hidden] { display: none; }
 
-.gauge { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.dial { display: block; width: 100%; max-width: 330px; height: auto; overflow: hidden; }
-.rim { fill: none; stroke: var(--brass); stroke-width: 6; }
-.band-buy { fill: var(--buy); }
-.band-hold { fill: var(--cream); }
-.band-high { fill: var(--high); }
-.ticks line { stroke: var(--brass); stroke-width: 2; }
-.label-light, .label-dark {
-  font-family: 'Cinzel', serif;
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 2px;
-  text-anchor: middle;
+.gauge { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+/* Brass case: turned (concentric) grain over a conic sheen, light from the top left */
+.case {
+  position: relative;
+  width: min(340px, 100%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle at 50% 50%, rgba(255,242,205,.07) 0 .7px, rgba(45,28,6,.09) .7px 1.6px),
+    repeating-radial-gradient(circle at 50% 50%, rgba(255,242,205,.04) 0 1px, transparent 1px 4.3px),
+    conic-gradient(from 210deg, #f3dca3, #b48546 12%, #6f4f24 25%, #c99a55 38%, #f0d595 50%, #a67a3c 63%, #5f421d 75%, #b98a4b 88%, #f3dca3);
+  box-shadow: 0 3px 0 #070b0e, 0 10px 14px rgba(0,0,0,.45), inset 1px 1px 0 rgba(255,244,212,.85), inset -1px -1px 0 rgba(40,25,5,.85);
 }
-.label-light { fill: var(--cream); }
-.label-dark { fill: var(--navy); }
+.face { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.knurl { fill: none; stroke: rgba(48,30,8,.6); stroke-width: 5; stroke-dasharray: 1.1 2; }
+.bevel-light { fill: none; stroke: rgba(255,240,205,.58); stroke-width: .75; }
+.bevel-dark { fill: none; stroke: rgba(48,30,8,.55); stroke-width: .8; }
+.seat { fill: none; stroke: #2b1d0b; stroke-width: 7; }
+
+.band { fill: none; stroke-width: 15; }
+.band-buy { stroke: #557d62; }
+.band-hold { stroke: #d6c9a8; }
+.band-high { stroke: #a24a37; }
+.band-text { font: 700 8px 'Cinzel', serif; letter-spacing: 2.5px; fill: #5c4f37; }
+.band-text.on-band { fill: #f3eee4; }
+.ticks line { stroke: #231c12; }
+.scale text { font: 700 9.5px 'Cormorant Garamond', serif; fill: #2a2216; text-anchor: middle; }
+.markers polygon { fill: #8a6430; stroke: #4a3214; stroke-width: .6; }
+.window { fill: #151617; stroke: rgba(0,0,0,.6); stroke-width: 3; }
+.window-rim { fill: none; stroke: rgba(80,62,34,.55); stroke-width: .7; }
+.serial { font: 500 6.5px 'Cinzel', serif; letter-spacing: 2.5px; fill: #7a6b4e; text-anchor: middle; }
+/* Letterpress: dark type on the enamel gets a light edge below it. */
+.face text { text-shadow: 0 1px 0 rgba(255,250,236,.75); }
+.face text.on-band { text-shadow: 0 -1px 0 rgba(0,0,0,.35); }
+
+/* Blued-steel hand; it settles with an overshoot and never quite stops, like a hairspring. */
 .needle {
-  transform-origin: 165px 165px;
-  transition: transform 1.2s cubic-bezier(.3, 1.4, .5, 1);
+  transform-origin: 170px 170px;
+  transition: transform 1.2s cubic-bezier(.25, 1.45, .45, 1);
 }
-.needle line { stroke: var(--brass-light); stroke-width: 4; stroke-linecap: round; }
-.hub { fill: var(--brass); }
-.hub-pin { fill: var(--navy); }
+.needle path { fill: #1b2430; }
+.needle .counterweight { fill: none; stroke: #1b2430; stroke-width: 2.6; }
+.tremble { transform-origin: 170px 170px; animation: tremble 3.4s ease-in-out infinite; }
+@keyframes tremble {
+  0% { transform: rotate(0); }
+  14% { transform: rotate(.32deg); }
+  29% { transform: rotate(-.18deg); }
+  47% { transform: rotate(.14deg); }
+  63% { transform: rotate(-.28deg); }
+  81% { transform: rotate(.09deg); }
+  100% { transform: rotate(0); }
+}
+.hub-pin { fill: #3b2a12; }
+
 /* A side with no limit is switched off: its band fades and says OFF. */
 .gauge.no-floor .band-buy, .gauge.no-floor .band-buy-label,
 .gauge.no-ceiling .band-high, .gauge.no-ceiling .band-high-label { opacity: 0.22; }
-.gauge.no-floor.no-ceiling .band-hold, .gauge.no-floor.no-ceiling .band-hold-label { opacity: 0.22; }
-/* Feed failed: the price shown is old, so grey the whole instrument. */
-.gauge.stale .dial, .gauge.stale .flaps { filter: grayscale(1); opacity: 0.45; }
+.gauge.no-floor.no-ceiling .band-hold, .gauge.no-floor.no-ceiling .band-hold-label { opacity: 0.4; }
+/* Feed failed: the price shown is old, so grey the face and flaps. */
+.gauge.stale .face, .gauge.stale .flaps { filter: grayscale(1); opacity: 0.5; }
 
 .zone { margin-left: 6px; color: var(--brass-light); }
 .zone.buy { color: #7cc29d; }
@@ -168,34 +200,42 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   justify-content: space-between;
   width: 100%;
   max-width: 300px;
-  margin-top: -4px;
-  font-size: 14px;
-  color: var(--muted);
+  font-size: 15px;
+  color: #d6ccb2;
 }
 
-/* Split-flap digits */
-.flaps { display: flex; gap: 4px; margin-top: 6px; perspective: 400px; }
+/* Split-flap digits, set in the window on the lower half of the face */
+.flaps {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 64.7%;
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  perspective: 300px;
+}
 .flap {
-  width: 46px;
-  height: 66px;
-  border-radius: 4px;
+  width: 32px;
+  height: 48px;
+  border-radius: 1px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 700 42px/1 'Playfair Display', Georgia, serif;
+  font: 700 31px/1 'Playfair Display', Georgia, serif;
   font-variant-numeric: lining-nums tabular-nums;
-  color: var(--ink);
-  background: linear-gradient(var(--navy-deep) 49%, #24323d 49%, #24323d 51%, #101c25 51%);
-  box-shadow: inset 0 0 0 1px #2a3742;
+  color: #f0e2bd;
+  background: linear-gradient(#3a3d40 0%, #2c2e31 49.5%, #08090a 49.5%, #08090a 50.5%, #26282a 50.5%, #303235 100%);
+  box-shadow: 0 1px 0 #000, 0 0 0 1px #0b0c0d;
 }
 .flap.dot {
-  width: 16px;
+  width: 9px;
   background: none;
   box-shadow: none;
   align-items: flex-end;
-  padding-bottom: 6px;
-  font-size: 34px;
-  color: var(--brass);
+  padding-bottom: 7px;
+  font-size: 26px;
+  color: #c9a160;
 }
 .flap.flip { animation: flip 0.45s ease-out; }
 @keyframes flip {
@@ -276,5 +316,6 @@ footer { margin-top: auto; text-align: center; color: #a8987a; }
 
 @media (prefers-reduced-motion: reduce) {
   .needle, .knob-cap { transition: none; }
+  .tremble { animation: none; }
   .flap.flip { animation: none; }
 }

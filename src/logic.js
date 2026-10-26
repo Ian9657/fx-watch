@@ -27,6 +27,14 @@ export function parseCitic(text) {
   return rates;
 }
 
+// The ticker tape: the last few quotes seen by the 10-minute check, newest
+// first. A check that sees the same quote as the last one adds nothing.
+export const TAPE_LENGTH = 12;
+export function appendTape(tape, sample) {
+  if (tape[0]?.t === sample.t) return tape;
+  return [sample, ...tape].slice(0, TAPE_LENGTH);
+}
+
 // Beijing calendar date (YYYY-MM-DD) for an epoch-ms timestamp.
 export function beijingDay(ms) {
   return new Date(ms + BEIJING).toISOString().slice(0, 10);

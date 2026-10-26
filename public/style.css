@@ -135,6 +135,50 @@ input {
 input::placeholder { color: #7d7259; }
 input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light); outline-offset: 2px; }
 
+/* Ticker tape: a strip of paper running between two slots */
+.tape { position: relative; height: 34px; margin: 12px -18px -6px; }
+.tape::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6px;
+  height: 22px;
+  background: #0a0f13;
+  box-shadow: inset 0 1px 2px #000, 0 1px 0 rgba(255,255,255,.04);
+}
+.tape-paper {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 18px;
+  overflow: hidden;
+  background: linear-gradient(#efe7d2, #e6dcc2);
+  box-shadow: 0 1px 0 rgba(0,0,0,.6);
+}
+.tape-paper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(90deg, rgba(120,100,60,.05) 0 1px, transparent 1px 7px);
+}
+.tape-run { display: flex; width: max-content; animation: tape 60s linear infinite; }
+.tape-run span {
+  flex-shrink: 0;
+  padding: 0 14px;
+  font: 11.5px/18px 'Special Elite', 'Courier New', monospace;
+  color: #2b241a;
+  white-space: nowrap;
+}
+.tape-run .fresh { animation: print .6s ease-out both; }
+@keyframes tape { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes print { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+.tape-slot { position: absolute; top: 2px; width: 18px; height: 30px; }
+.tape-slot.left { left: 0; background: linear-gradient(90deg, #0b1116, #1a242c); box-shadow: 1px 0 0 rgba(255,255,255,.06), 2px 0 3px rgba(0,0,0,.6); }
+.tape-slot.right { right: 0; background: linear-gradient(270deg, #0b1116, #1a242c); box-shadow: -1px 0 0 rgba(255,255,255,.06), -2px 0 3px rgba(0,0,0,.6); }
+
 /* Gauges */
 #app { display: flex; flex-direction: column; gap: 14px; flex: 1; }
 #app[hidden] { display: none; }
@@ -445,5 +489,6 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5
   .tremble { animation: none; }
   .fall, .rise { animation-duration: 0s; }
   .sheet { animation: none; }
+  .tape-run, .tape-run .fresh { animation: none; }
   .wheel-col { transition: none; }
 }

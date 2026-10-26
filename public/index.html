@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="/icon-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:wght@600;700&family=Playfair+Display:wght@700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:wght@600;700&family=Playfair+Display:wght@700&family=Special+Elite&display=swap">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -38,6 +38,12 @@
     </form>
 
     <div id="app" hidden>
+      <!-- Ticker tape: the quotes the 10-minute check has seen, newest first. -->
+      <div class="tape" role="region" aria-label="Recent quotes">
+        <div class="tape-paper"><div class="tape-run" id="tape-run"></div></div>
+        <div class="tape-slot left" aria-hidden="true"></div>
+        <div class="tape-slot right" aria-hidden="true"></div>
+      </div>
       <!-- One dial; the selector below switches which currency it reads. -->
       <section class="gauge" id="gauge" aria-label="Exchange rate dial">
         <!-- The crown winds the watch: pressing it refreshes now. -->

@@ -1,4 +1,4 @@
-import { PAIRS, SIDES, parseCitic, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage } from './logic.js';
+import { PAIRS, SIDES, parseCitic, appendTape, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage } from './logic.js';
 
 async function load(env) {
   return { lastCheck: null, ...migrate((await env.STORE.get('data', 'json')) || {}) };
@@ -17,15 +17,23 @@ async function fetchCitic() {
   return parseCitic(await res.text());
 }
 
-// Keep the last price of each Beijing day, for the change vs. yesterday.
+// Keep the last price of each Beijing day (for the change vs. yesterday)
+// and the last few quotes (for the ticker tape).
 async function record(env, quotes) {
   const t = Math.max(...PAIRS.map(p => quotes[p].time));
+  const sample = { t, ...Object.fromEntries(PAIRS.map(p => [p, quotes[p].price])) };
   const day = beijingDay(t * 1000);
-  const daily = (await env.STORE.get('daily', 'json')) || [];
+  const [daily, tape] = await Promise.all([
+    env.STORE.get('daily', 'json').then(v => v || []),
+    env.STORE.get('tape', 'json').then(v => v || []),
+  ]);
   if (daily.at(-1)?.t === t) return;
   const next = daily.filter(d => d.d !== day);
-  next.push({ d: day, t, ...Object.fromEntries(PAIRS.map(p => [p, quotes[p].price])) });
-  await env.STORE.put('daily', JSON.stringify(next.slice(-30)));
+  next.push({ d: day, ...sample });
+  await Promise.all([
+    env.STORE.put('daily', JSON.stringify(next.slice(-30))),
+    env.STORE.put('tape', JSON.stringify(appendTape(tape, sample))),
+  ]);
 }
 
 async function sendTelegram(env, text) {
@@ -77,8 +85,8 @@ async function api(request, env, path) {
   }
 
   if (path === '/api/settings' && request.method === 'GET') {
-    const { limits, lastCheck } = await load(env);
-    return json({ limits, lastCheck });
+    const [{ limits, lastCheck }, tape] = await Promise.all([load(env), env.STORE.get('tape', 'json')]);
+    return json({ limits, lastCheck, tape: tape || [] });
   }
 
   if (path === '/api/settings' && request.method === 'PUT') {

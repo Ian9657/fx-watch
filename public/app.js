@@ -11,6 +11,7 @@ const store = {
 let rates = {};
 let limits = { GBP: { floor: null, ceiling: null }, USD: { floor: null, ceiling: null } };
 let lastCheck = null;  // when the 10-minute alert check last ran (epoch ms)
+let tape = [];         // quotes the alert check has recorded, newest first
 let lastGood = null;   // when this page last loaded prices successfully
 let feedError = null;  // message if the latest price load failed
 
@@ -259,6 +260,31 @@ function render() {
     $('gauge').setAttribute('aria-label', `${pair} to CNY ${r.price.toFixed(4)}, ${$('zone').textContent.replaceAll('·', '').trim()}`);
   }
   renderStatus();
+  drawTape();
+}
+
+// The tape leads with the live quote when it's newer than the last recorded
+// one, then the recorded quotes. Arrows compare each line with the one after.
+let tapeKey = '';
+function drawTape() {
+  const live = PAIRS.every(p => rates[p])
+    ? { t: Math.max(...PAIRS.map(p => rates[p].time)), ...Object.fromEntries(PAIRS.map(p => [p, rates[p].price])) }
+    : null;
+  const lines = live && (!tape[0] || live.t > tape[0].t) ? [live, ...tape] : tape;
+  const arrow = (now, before) => before == null ? '' : now > before ? ' ▲' : now < before ? ' ▼' : ' =';
+  const texts = lines.map((q, i) => `${time(new Date(q.t * 1000))}  ${PAIRS.map(p => `${p} ${q[p].toFixed(4)}${arrow(q[p], lines[i + 1]?.[p])}`).join('  ')}   ·`);
+  if (lines.length < 4) texts.push('RECORDING A QUOTE EVERY 10 MINUTES   ·');
+  // Each half of the loop must be wider than the screen, or a gap shows.
+  while (texts.length < 4) texts.push(...texts);
+  const key = texts.join('|');
+  if (key === tapeKey) return; // don't restart the scroll unless something changed
+  const fresh = tapeKey && !tapeKey.startsWith(texts[0]);
+  tapeKey = key;
+  const make = (text, i) => Object.assign(document.createElement('span'), { textContent: text, className: i === 0 && fresh ? 'fresh' : '' });
+  const run = $('tape-run');
+  run.replaceChildren(...texts.map(make), ...texts.map(t => make(t, -1)));
+  // Keep a steady reading speed whatever the length: about 28px a second.
+  requestAnimationFrame(() => { run.style.animationDuration = `${Math.max(20, run.scrollWidth / 2 / 28)}s`; });
 }
 
 function selectPair(next) {
@@ -284,7 +310,7 @@ async function loadRates() {
 
 async function loadSettings() {
   let check;
-  ({ limits, lastCheck: check } = await getJSON('/api/settings'));
+  ({ limits, lastCheck: check, tape = [] } = await getJSON('/api/settings'));
   lastCheck = check?.time ?? null;
 }
 

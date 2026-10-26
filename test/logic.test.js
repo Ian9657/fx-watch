@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage } from '../src/logic.js';
+import { parseCitic, appendTape, TAPE_LENGTH, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage } from '../src/logic.js';
 
 const none = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
 const limits = (gbp, usd = {}) => ({
@@ -78,4 +78,15 @@ test('test message does not claim a limit was crossed', () => {
   assert.match(msg, /GBP 8\.9580 · USD 6\.6900/);
   assert.match(msg, /Alerts: GBP below 8\.9000 or above 9\.1000 · USD off/);
   assert.doesNotMatch(msg, /your (floor|ceiling)/);
+});
+
+test('ticker tape keeps the newest quotes first and skips repeats', () => {
+  let tape = [];
+  tape = appendTape(tape, { t: 1, GBP: 8.9 });
+  tape = appendTape(tape, { t: 2, GBP: 8.91 });
+  tape = appendTape(tape, { t: 2, GBP: 8.91 });
+  assert.deepEqual(tape.map(s => s.t), [2, 1]);
+  for (let t = 3; t < 30; t++) tape = appendTape(tape, { t });
+  assert.equal(tape.length, TAPE_LENGTH);
+  assert.equal(tape[0].t, 29);
 });

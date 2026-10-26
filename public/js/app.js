@@ -29,9 +29,11 @@ async function refreshAll() {
   try {
     // History (up to ~90 KB) is only fetched while the back is showing.
     await Promise.all([loadSettings(), loadRates(), turned() ? loadHistory() : null]);
+    const wasLocked = !$('lock').hidden;
     unlock();
     showError('');
     render();
+    if (wasLocked) fit();
   } catch (err) {
     if (err instanceof Locked) {
       store.remove('password');
@@ -71,6 +73,24 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) refr
 window.addEventListener('pageshow', e => { if (e.persisted) refreshAll(); });
 window.addEventListener('focus', () => refreshAll());
 
+// Fit the page to one screen: if it's taller than the window, shrink the
+// watch (down to 60%) by just enough. If that still isn't enough, let the
+// page scroll (html.tall) rather than cut anything off.
+function fit() {
+  const gauge = $('gauge'), root = document.documentElement;
+  gauge.style.transform = gauge.style.marginBottom = '';
+  root.classList.remove('tall');
+  const over = document.querySelector('main').scrollHeight - innerHeight;
+  if (over <= 0) return;
+  const h = gauge.offsetHeight, k = Math.max(0.6, (h - over) / h);
+  gauge.style.transform = `scale(${k.toFixed(3)})`;
+  gauge.style.marginBottom = `${(-(1 - k) * h).toFixed(1)}px`; // give back the space
+  root.classList.toggle('tall', document.querySelector('main').scrollHeight > innerHeight + 1);
+}
+addEventListener('resize', fit);
+document.fonts?.ready.then(fit);
+
 buildFace();
-if (store.get('password')) refreshAll();
+if (store.get('password')) refreshAll().then(fit);
 else lock();
+fit();

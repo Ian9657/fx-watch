@@ -16,7 +16,8 @@ let feedError = null;  // message if the latest price load failed
 
 const QUOTE_STALE_MIN = 60;  // CITIC normally re-quotes every few minutes
 const CHECK_STALE_MIN = 25;  // the alert check runs every 10 minutes
-const shown = {}; // last digits drawn per pair, so only changed flaps flip
+let pair = store.get('pair') === 'USD' ? 'USD' : 'GBP'; // which currency the dial reads
+let shown = ''; // digits currently on the flaps, so only changed ones flip
 
 const time = (date, seconds = false) => date.toLocaleTimeString('en-GB', {
   hour: '2-digit', minute: '2-digit', ...(seconds && { second: '2-digit' }),
@@ -110,9 +111,9 @@ function distance(price, { floor, ceiling }) {
   return 'No limits set';
 }
 
-function drawFlaps(pair, text) {
-  const box = $(`flaps-${pair}`);
-  const before = shown[pair] || '';
+function drawFlaps(text) {
+  const box = $('flaps');
+  const before = shown;
   box.replaceChildren(...[...text].map((ch, i) => {
     const el = document.createElement('span');
     el.className = ch === '.' ? 'flap dot' : 'flap';
@@ -121,50 +122,65 @@ function drawFlaps(pair, text) {
     return el;
   }));
   box.setAttribute('aria-label', text);
-  shown[pair] = text;
+  shown = text;
 }
 
 function render() {
   for (const p of PAIRS) {
-    const r = rates[p];
-    const l = limits[p];
-    const gauge = document.querySelector(`.gauge[data-pair="${p}"]`);
-    const noFloor = l.floor == null;
-    const noCeiling = l.ceiling == null;
-    gauge.classList.toggle('no-floor', noFloor);
-    gauge.classList.toggle('no-ceiling', noCeiling);
-    gauge.classList.toggle('stale', !!feedError);
-    if ($(`floor-${p}`)) {
-      $(`floor-${p}`).textContent = noFloor ? 'Floor off' : `Floor ${l.floor.toFixed(4)}`;
-      $(`ceiling-${p}`).textContent = noCeiling ? 'Ceiling off' : `Ceiling ${l.ceiling.toFixed(4)}`;
-      $(`label-floor-${p}`).textContent = noFloor ? 'OFF' : 'BUY';
-      $(`label-ceiling-${p}`).textContent = noCeiling ? 'OFF' : 'TOO HIGH';
-      $(`label-hold-${p}`).textContent = noFloor && noCeiling ? 'ALERTS OFF' : 'HOLD';
-    }
-    if (!r) continue;
+    // Lamps track every currency, so the one not on the dial still shows its zone.
+    const zone = rates[p] && !feedError ? zoneOf(rates[p].price, limits[p]) : '';
+    $(`lamp-${p}`).className = `lamp-dot ${zone}`;
+    document.querySelector(`.pick[data-pair="${p}"]`).setAttribute('aria-pressed', String(p === pair));
+    document.querySelector(`.pick[data-pair="${p}"]`).setAttribute('aria-label', `${p}${zone ? `, ${zone === 'high' ? 'too high' : zone}` : ''}`);
+  }
+  $('knob').classList.toggle('usd', pair === 'USD');
+  $('pair-label').textContent = `${pair} → CNY`;
 
+  const r = rates[pair];
+  const l = limits[pair];
+  const noFloor = l.floor == null;
+  const noCeiling = l.ceiling == null;
+  const gauge = $('gauge');
+  gauge.classList.toggle('no-floor', noFloor);
+  gauge.classList.toggle('no-ceiling', noCeiling);
+  gauge.classList.toggle('stale', !!feedError);
+  $('floor').textContent = noFloor ? 'Floor off' : `Floor ${l.floor.toFixed(4)}`;
+  $('ceiling').textContent = noCeiling ? 'Ceiling off' : `Ceiling ${l.ceiling.toFixed(4)}`;
+  $('label-floor').textContent = noFloor ? 'OFF' : 'BUY';
+  $('label-ceiling').textContent = noCeiling ? 'OFF' : 'TOO HIGH';
+  $('label-hold').textContent = noFloor && noCeiling ? 'ALERTS OFF' : 'HOLD';
+
+  if (r) {
     const deg = position(r.price, l.floor, l.ceiling) * 180 - 90;
-    $(`needle-${p}`).style.transform = `rotate(${deg}deg)`;
-    drawFlaps(p, r.price.toFixed(4));
+    $('needle').style.transform = `rotate(${deg}deg)`;
+    drawFlaps(r.price.toFixed(4));
 
     const zone = zoneOf(r.price, l);
     // An old price must not read as a current BUY/HOLD call.
-    $(`zone-${p}`).textContent = feedError ? '· STALE'
+    $('zone').textContent = feedError ? '· STALE'
       : { buy: '· BUY', high: '· TOO HIGH', hold: '· HOLD' }[zone] || '· ALERTS OFF';
-    $(`zone-${p}`).className = `zone ${feedError ? '' : zone}`;
+    $('zone').className = `zone ${feedError ? '' : zone}`;
 
     const parts = [distance(r.price, l)];
-    // The small dial has no floor/ceiling row, so say which side is off.
-    if (!$(`floor-${p}`) && noFloor !== noCeiling) parts.push(noFloor ? 'floor off' : 'ceiling off');
     if (r.previousClose) {
       const pct = ((r.price - r.previousClose) / r.previousClose) * 100;
       parts.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% today`);
     }
     parts.push(`quoted ${time(new Date(r.time * 1000))}`);
-    $(`note-${p}`).textContent = parts.join(' · ');
+    $('note').textContent = parts.join(' · ');
   }
   renderStatus();
 }
+
+function selectPair(next) {
+  if (next === pair) return;
+  pair = next;
+  store.set('pair', pair);
+  render();
+}
+
+document.querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => selectPair(b.dataset.pair)));
+$('knob').addEventListener('click', () => selectPair(pair === 'GBP' ? 'USD' : 'GBP'));
 
 async function loadRates() {
   try {

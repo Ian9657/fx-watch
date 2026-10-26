@@ -44,9 +44,10 @@
     </form>
 
     <div id="app" hidden>
-      <section class="gauge" data-pair="GBP" aria-labelledby="gbp-name">
-        <h2 id="gbp-name" class="caps">GBP → CNY <span class="zone" id="zone-GBP"></span></h2>
-        <svg class="dial" viewBox="0 0 330 185" role="img" aria-labelledby="gbp-name">
+      <!-- One dial; the selector below switches which currency it reads. -->
+      <section class="gauge" id="gauge" aria-labelledby="pair-name">
+        <h2 id="pair-name" class="caps"><span id="pair-label">GBP → CNY</span> <span class="zone" id="zone"></span></h2>
+        <svg class="dial" viewBox="0 0 330 185" role="img" aria-labelledby="pair-name">
           <circle cx="165" cy="165" r="158" class="rim"></circle>
           <path d="M25,165 A140,140 0 0 1 82.7,51.7 L99.1,74.4 A112,112 0 0 0 53,165 Z" class="band-buy"></path>
           <path d="M82.7,51.7 A140,140 0 0 1 247.3,51.7 L230.9,74.4 A112,112 0 0 0 99.1,74.4 Z" class="band-hold"></path>
@@ -54,35 +55,24 @@
           <g class="ticks">
             <line x1="25" y1="165" x2="17" y2="165"></line><line x1="31.9" y1="121.7" x2="24.3" y2="119.3"></line><line x1="51.7" y1="82.7" x2="45.3" y2="78"></line><line x1="82.7" y1="51.7" x2="78" y2="45.3"></line><line x1="121.7" y1="31.9" x2="119.3" y2="24.3"></line><line x1="165" y1="25" x2="165" y2="17"></line><line x1="208.3" y1="31.9" x2="210.7" y2="24.3"></line><line x1="247.3" y1="51.7" x2="252" y2="45.3"></line><line x1="278.3" y1="82.7" x2="284.7" y2="78"></line><line x1="298.1" y1="121.7" x2="305.7" y2="119.3"></line><line x1="305" y1="165" x2="313" y2="165"></line>
           </g>
-          <text x="84.8" y="124" class="label-light band-buy-label" id="label-floor-GBP" transform="rotate(-63 84.8 124)">BUY</text>
-          <text x="165" y="96" class="label-dark band-hold-label" id="label-hold-GBP">HOLD</text>
-          <text x="245.2" y="124" class="label-light band-high-label" id="label-ceiling-GBP" transform="rotate(63 245.2 124)">TOO HIGH</text>
-          <g class="needle" id="needle-GBP"><line x1="165" y1="165" x2="165" y2="40"></line></g>
+          <text x="84.8" y="124" class="label-light band-buy-label" id="label-floor" transform="rotate(-63 84.8 124)">BUY</text>
+          <text x="165" y="96" class="label-dark band-hold-label" id="label-hold">HOLD</text>
+          <text x="245.2" y="124" class="label-light band-high-label" id="label-ceiling" transform="rotate(63 245.2 124)">TOO HIGH</text>
+          <g class="needle" id="needle"><line x1="165" y1="165" x2="165" y2="40"></line></g>
           <circle cx="165" cy="165" r="13" class="hub"></circle>
           <circle cx="165" cy="165" r="5" class="hub-pin"></circle>
         </svg>
-        <div class="limits"><span id="floor-GBP">Floor —</span><span id="ceiling-GBP">Ceiling —</span></div>
-        <div class="flaps" id="flaps-GBP" role="img" aria-label="—"></div>
-        <p class="note" id="note-GBP"></p>
+        <div class="limits"><span id="floor">Floor —</span><span id="ceiling">Ceiling —</span></div>
+        <div class="flaps" id="flaps" role="img" aria-label="—"></div>
+        <p class="note" id="note"></p>
       </section>
 
-      <hr>
-
-      <section class="gauge small-gauge" data-pair="USD" aria-labelledby="usd-name">
-        <svg class="dial" viewBox="0 0 330 185" role="img" aria-labelledby="usd-name">
-          <circle cx="165" cy="165" r="158" class="rim"></circle>
-          <path d="M25,165 A140,140 0 0 1 82.7,51.7 L99.1,74.4 A112,112 0 0 0 53,165 Z" class="band-buy"></path>
-          <path d="M82.7,51.7 A140,140 0 0 1 247.3,51.7 L230.9,74.4 A112,112 0 0 0 99.1,74.4 Z" class="band-hold"></path>
-          <path d="M247.3,51.7 A140,140 0 0 1 305,165 L277,165 A112,112 0 0 0 230.9,74.4 Z" class="band-high"></path>
-          <g class="needle" id="needle-USD"><line x1="165" y1="165" x2="165" y2="40"></line></g>
-          <circle cx="165" cy="165" r="18" class="hub"></circle>
-        </svg>
-        <div class="readout">
-          <h2 id="usd-name" class="caps">USD → CNY <span class="zone" id="zone-USD"></span></h2>
-          <div class="flaps flaps-small" id="flaps-USD" role="img" aria-label="—"></div>
-          <p class="note" id="note-USD"></p>
-        </div>
-      </section>
+      <!-- Each lamp shows its currency's zone, so the other one is visible without switching. -->
+      <div class="selector">
+        <button class="pick" data-pair="GBP" aria-pressed="true"><span class="lamp-dot" id="lamp-GBP"></span><span class="caps">GBP</span></button>
+        <button class="knob" id="knob" aria-label="Switch currency"><span class="knob-cap"><span class="knob-mark"></span></span></button>
+        <button class="pick" data-pair="USD" aria-pressed="false"><span class="lamp-dot" id="lamp-USD"></span><span class="caps">USD</span></button>
+      </div>
 
       <button id="toggle-settings" class="brass" aria-expanded="false" aria-controls="settings">SET FLOOR &amp; CEILING</button>
 

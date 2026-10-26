@@ -223,7 +223,9 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   color: #a39c8a;
   animation: hint 2.4s ease-in-out infinite;
 }
-.turn-hint[hidden] { display: none; }
+/* The hint keeps its line even when hidden, so turning the watch over
+   never moves what's below it. */
+.turn-hint[hidden] { display: block; visibility: hidden; }
 .turn-hint.still { animation: none; opacity: .8; }
 
 /* The back's round chart, made like the front: the same cream paper,

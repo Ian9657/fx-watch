@@ -10,9 +10,9 @@
 
 * { box-sizing: border-box; }
 
-/* One screen, no scrolling or rubber-band bounce: the watch shrinks to fit
-   short screens (js/app.js). If even the smallest watch can't fit, .tall
-   lets the page scroll rather than hide anything. */
+/* One screen, no scrolling or rubber-band bounce: the watch is sized to the
+   screen (js/app.js). If even the smallest watch can't fit, .tall lets the
+   page scroll rather than hide anything. */
 html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 html.tall, html.tall body { height: auto; overflow: auto; }
 body { touch-action: manipulation; }
@@ -183,7 +183,8 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .tape-slot.right { right: 0; background: linear-gradient(270deg, #0b1116, #1a242c); box-shadow: -1px 0 0 rgba(255,255,255,.06), -2px 0 3px rgba(0,0,0,.6); }
 
 /* Gauges */
-#app { display: flex; flex-direction: column; gap: 14px; flex: 1; }
+/* Spare height is shared evenly between the parts, not left at the bottom. */
+#app { display: flex; flex-direction: column; justify-content: space-evenly; gap: 14px; flex: 1; }
 #app[hidden] { display: none; }
 
 .gauge { display: flex; flex-direction: column; align-items: center; transform-origin: 50% 0; }

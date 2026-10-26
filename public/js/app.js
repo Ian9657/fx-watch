@@ -73,19 +73,29 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) refr
 window.addEventListener('pageshow', e => { if (e.persisted) refreshAll(); });
 window.addEventListener('focus', () => refreshAll());
 
-// Fit the page to one screen: if it's taller than the window, shrink the
-// watch (down to 60%) by just enough. If that still isn't enough, let the
-// page scroll (html.tall) rather than cut anything off.
+// Size the watch to the screen, as clock and compass apps do: it fills the
+// same share of the width on every phone, as far as the height allows,
+// while text and controls keep their size and the spare height is shared
+// out between the parts (#app). It grows by at most 20% and shrinks to 60%;
+// if even that won't fit, the page scrolls (html.tall) rather than cut
+// anything off.
 function fit() {
-  const gauge = $('gauge'), root = document.documentElement;
+  const gauge = $('gauge'), main = document.querySelector('main'), root = document.documentElement;
   gauge.style.transform = gauge.style.marginBottom = '';
   root.classList.remove('tall');
-  const over = document.querySelector('main').scrollHeight - innerHeight;
-  if (over <= 0) return;
-  const h = gauge.offsetHeight, k = Math.max(0.6, (h - over) / h);
+  if ($('app').hidden) return;
+  main.style.minHeight = '0'; // measure the content's own height
+  const over = main.scrollHeight - innerHeight;
+  main.style.minHeight = '';
+  const h = gauge.offsetHeight;
+  const byWidth = gauge.clientWidth / $('case').offsetWidth;
+  // Give the watch half of any spare height; take all of any shortfall.
+  const byHeight = (h - (over > 0 ? over : over / 2)) / h;
+  const k = Math.max(0.6, Math.min(1.2, byWidth, byHeight));
+  if (Math.abs(k - 1) < 0.005) return;
   gauge.style.transform = `scale(${k.toFixed(3)})`;
-  gauge.style.marginBottom = `${(-(1 - k) * h).toFixed(1)}px`; // give back the space
-  root.classList.toggle('tall', document.querySelector('main').scrollHeight > innerHeight + 1);
+  gauge.style.marginBottom = `${((k - 1) * h).toFixed(1)}px`; // match the space to the new size
+  root.classList.toggle('tall', main.scrollHeight > innerHeight + 1);
 }
 addEventListener('resize', fit);
 document.fonts?.ready.then(fit);

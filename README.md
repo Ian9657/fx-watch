@@ -21,7 +21,7 @@ One Cloudflare Worker:
 
 | Part | Where |
 |---|---|
-| Web app | `public/` |
+| Web app | `public/`, with one script module per part of the page in `public/js/` (dial, tape, back, settings sheet, shared state, start-up) |
 | API (`/api/rates`, `/api/history`, `/api/settings`, `/api/test`) | `src/worker.js` |
 | Parsing, alert rules, messages | `src/logic.js` |
 | Floors, ceilings, alert state, daily closing prices, ticker tape, 90-day price history | Workers KV (`STORE`) |

@@ -54,7 +54,19 @@ function unlock() {
   $('lock').hidden = true;
   $('app').hidden = false;
   $('refresh').hidden = false;
+  $('crown-hint').hidden = !!store.get('wound');
 }
+
+// Pressing the crown winds the watch: refresh now. The hint shows until it's
+// been pressed once on this device.
+let woundAt = 0;
+$('crown').addEventListener('click', async () => {
+  store.set('wound', '1');
+  $('crown-hint').hidden = true;
+  await refreshAll();
+  woundAt = Date.now();
+  renderStatus();
+});
 
 const minutesAgo = ms => (Date.now() - ms) / 60000;
 
@@ -62,7 +74,7 @@ const minutesAgo = ms => (Date.now() - ms) / 60000;
 function renderStatus() {
   const quoteTime = Math.max(0, ...Object.values(rates).map(r => r.time * 1000));
   let level = 'ok';
-  let text = 'LIVE';
+  let text = woundAt && Date.now() - woundAt < 20_000 ? 'LIVE · REFRESHED JUST NOW' : 'LIVE';
   if (feedError) {
     level = 'error';
     text = lastGood ? `CITIC FEED ERROR · PRICES FROM ${time(new Date(lastGood))}` : 'CITIC FEED ERROR';
@@ -76,7 +88,7 @@ function renderStatus() {
   } else if (minutesAgo(lastCheck) > CHECK_STALE_MIN) {
     if (level === 'ok') level = 'warn';
     text += ` · ALERTS LAST CHECKED ${time(new Date(lastCheck))}`;
-  } else {
+  } else if (text === 'LIVE') {
     text += ` · ALERTS CHECKED ${time(new Date(lastCheck))}`;
   }
   $('refresh').className = `status ${level}`;
@@ -207,8 +219,8 @@ function render() {
 
     const zone = zoneOf(r.price, l);
     // An old price must not read as a current BUY/HOLD call.
-    $('zone').textContent = feedError ? '· STALE'
-      : { buy: '· BUY', high: '· TOO HIGH', hold: '· HOLD' }[zone] || '· ALERTS OFF';
+    $('zone').textContent = feedError ? '· STALE ·'
+      : { buy: '· BUY ·', high: '· TOO HIGH ·', hold: '· HOLD ·' }[zone] || '· ALERTS OFF ·';
     $('zone').className = `zone ${feedError ? '' : zone}`;
 
     const parts = [distance(r.price, l)];
@@ -218,6 +230,7 @@ function render() {
     }
     parts.push(`quoted ${time(new Date(r.time * 1000))}`);
     $('note').textContent = parts.join(' · ');
+    $('gauge').setAttribute('aria-label', `${pair} to CNY ${r.price.toFixed(4)}, ${$('zone').textContent.replaceAll('·', '').trim()}`);
   }
   renderStatus();
 }

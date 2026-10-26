@@ -20,17 +20,11 @@
 </head>
 <body>
   <main>
-    <header class="plate">
-      <h1>FX WATCH</h1>
-      <p class="caps small">CITIC BUY PRICE</p>
+    <header class="masthead">
+      <h1 class="press">FX WATCH</h1>
+      <p class="caps small press">CITIC BUY PRICE</p>
     </header>
-
-    <!-- Feed and alert health. Tapping it refreshes. -->
-    <button id="refresh" class="status" hidden>
-      <span class="lamp" id="lamp" aria-hidden="true"></span>
-      <span id="status-text">—</span>
-      <span aria-hidden="true">↻</span>
-    </button>
+    <div class="etched" aria-hidden="true"></div>
 
     <p id="error" class="error" hidden></p>
 
@@ -39,17 +33,49 @@
       <p class="caps">PRIVATE INSTRUMENT</p>
       <label for="password">Password</label>
       <input id="password" type="password" autocomplete="current-password" required>
-      <button type="submit" class="brass">UNLOCK</button>
+      <button type="submit" class="btn press">UNLOCK</button>
       <p id="lock-status" class="note" role="status"></p>
     </form>
 
     <div id="app" hidden>
       <!-- One dial; the selector below switches which currency it reads. -->
-      <section class="gauge" id="gauge" aria-labelledby="pair-name">
-        <h2 id="pair-name" class="caps"><span id="pair-label">GBP → CNY</span> <span class="zone" id="zone"></span></h2>
+      <section class="gauge" id="gauge" aria-label="Exchange rate dial">
+        <!-- The crown winds the watch: pressing it refreshes now. -->
+        <div class="crown-wrap">
+          <button class="crown" id="crown" aria-label="Refresh now">
+            <svg viewBox="0 0 120 78" aria-hidden="true">
+              <defs>
+                <linearGradient id="g-bow" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#f5e0aa"></stop>
+                  <stop offset=".35" stop-color="#b98a4b"></stop>
+                  <stop offset=".7" stop-color="#5f421d"></stop>
+                  <stop offset="1" stop-color="#9c7136"></stop>
+                </linearGradient>
+                <linearGradient id="g-cyl" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#6a4b22"></stop>
+                  <stop offset=".28" stop-color="#f3dca3"></stop>
+                  <stop offset=".5" stop-color="#c39352"></stop>
+                  <stop offset="1" stop-color="#4f3616"></stop>
+                </linearGradient>
+              </defs>
+              <ellipse cx="60" cy="27" rx="31" ry="23" fill="none" stroke="#1a1208" stroke-width="8" opacity=".5" transform="translate(1.5 2.5)"></ellipse>
+              <ellipse cx="60" cy="27" rx="31" ry="23" fill="none" stroke="url(#g-bow)" stroke-width="7"></ellipse>
+              <path d="M31.5,22 A31,23 0 0 1 60,4.5" fill="none" stroke="rgba(255,244,214,.75)" stroke-width="1.2"></path>
+              <rect x="50" y="56" width="20" height="16" fill="url(#g-cyl)"></rect>
+              <rect x="46" y="68" width="28" height="9" rx=".6" fill="url(#g-cyl)"></rect>
+              <rect x="39" y="37" width="42" height="22" rx="1.2" fill="url(#g-cyl)"></rect>
+              <g stroke="rgba(55,36,12,.55)" stroke-width="1">
+                <line x1="43" y1="39.5" x2="43" y2="56.5"></line><line x1="46" y1="39" x2="46" y2="57"></line><line x1="49" y1="39" x2="49" y2="57"></line><line x1="52" y1="39" x2="52" y2="57"></line><line x1="55" y1="39" x2="55" y2="57"></line><line x1="58" y1="39" x2="58" y2="57"></line><line x1="61" y1="39" x2="61" y2="57"></line><line x1="64" y1="39" x2="64" y2="57"></line><line x1="67" y1="39" x2="67" y2="57"></line><line x1="70" y1="39" x2="70" y2="57"></line><line x1="73" y1="39" x2="73" y2="57"></line><line x1="76" y1="39" x2="76" y2="57"></line><line x1="79" y1="39.5" x2="79" y2="56.5"></line>
+              </g>
+              <rect x="39" y="37" width="42" height="22" rx="1.2" fill="none" stroke="rgba(255,240,200,.35)" stroke-width=".8"></rect>
+              <line x1="39" y1="59" x2="81" y2="59" stroke="#2a1c0a" stroke-width="1"></line>
+            </svg>
+          </button>
+          <span class="crown-hint press" id="crown-hint" hidden>◂ PRESS TO WIND</span>
+        </div>
         <!-- Brass case; the face is drawn in SVG, scale and labels filled in by app.js. -->
         <div class="case">
-          <svg class="face" viewBox="0 0 340 340" role="img" aria-labelledby="pair-name">
+          <svg class="face" viewBox="0 0 340 340" aria-hidden="true">
             <defs>
               <radialGradient id="g-face" cx=".32" cy=".26" r=".85">
                 <stop offset="0" stop-color="#f4eedf"></stop>
@@ -102,7 +128,7 @@
               <g id="markers" class="markers"></g>
               <rect x="66" y="212" width="208" height="64" rx="1" class="window"></rect>
               <rect x="63.5" y="209.5" width="213" height="69" class="window-rim"></rect>
-              <text x="170" y="300" class="serial">FX WATCH · No. 01</text>
+              <text x="170" y="298" class="pair-engrave" id="pair-label">GBP → CNY</text>
               <g class="needle" id="needle" filter="url(#g-shadow)">
                 <g class="tremble">
                   <path d="M168.6,182 L169.3,46 L170,40 L170.7,46 L171.4,182 Z"></path>
@@ -118,8 +144,6 @@
           </svg>
           <div class="flaps" id="flaps" role="img" aria-label="—"></div>
         </div>
-        <div class="limits"><span id="floor">Floor —</span><span id="ceiling">Ceiling —</span></div>
-        <p class="note" id="note"></p>
       </section>
 
       <!-- Each lamp shows its currency's zone, so the other one is visible without switching. -->
@@ -129,7 +153,18 @@
         <button class="pick" data-pair="USD" aria-pressed="false"><span class="lamp-dot" id="lamp-USD"></span><span class="caps">USD</span></button>
       </div>
 
-      <button id="toggle-settings" class="brass" aria-expanded="false" aria-controls="settings">SET FLOOR &amp; CEILING</button>
+      <div class="readout">
+        <p class="zone-line press"><span class="zone" id="zone"></span></p>
+        <p class="limits press"><span id="floor">Floor —</span> · <span id="ceiling">Ceiling —</span></p>
+        <p class="note press" id="note"></p>
+        <!-- Feed and alert health. Tapping it refreshes too. -->
+        <button id="refresh" class="status press" hidden>
+          <span class="lamp" id="lamp" aria-hidden="true"></span>
+          <span id="status-text">—</span>
+        </button>
+      </div>
+
+      <button id="toggle-settings" class="btn press" aria-expanded="false" aria-controls="settings">Set floor &amp; ceiling</button>
 
       <form id="settings" class="settings" hidden>
         <p class="note">A Telegram message when a price drops below its floor or rises above its ceiling. Leave empty to turn off.</p>
@@ -142,12 +177,12 @@
           <input id="floor-input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD floor">
           <input id="ceiling-input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD ceiling">
         </div>
-        <button type="submit" class="brass">SAVE</button>
+        <button type="submit" class="btn press">SAVE</button>
         <p class="note"><span id="form-status" role="status"></span> <button type="button" id="test" class="link">Send a test message</button></p>
       </form>
     </div>
 
-    <footer class="caps small">CITIC BANK CUSTOMER BUY PRICE · FOR REFERENCE</footer>
+    <footer class="caps small press">CITIC BANK CUSTOMER BUY PRICE · FOR REFERENCE</footer>
   </main>
 </body>
 </html>

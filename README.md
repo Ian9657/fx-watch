@@ -2,14 +2,15 @@
 
 A small web app for buying GBP and USD through China CITIC Bank. It shows CITIC's customer buy price and sends a Telegram message when a price drops below your floor or rises above your ceiling.
 
-Live at **[fx.etarc.net](https://fx.etarc.net)**. Works on iPhone and Mac as a home-screen / Dock app.
+Live at **[fx.etarc.net](https://fx.etarc.net)**. Works on iPhone and Mac as a home-screen / Dock app. Styled as a ship's engine order telegraph: the needle shows where the price sits between your floor and ceiling.
 
 ## What it does
 
 - Shows the CITIC customer buy price (客户购汇价) for GBP→CNY and USD→CNY, refreshed every 30 seconds while open
 - Checks both prices every 10 minutes. Each currency can have a floor (alert when the price drops below it) and a ceiling (alert when it rises above it). Each side alerts once, then re-arms when the price is back inside
 - Shows the change since yesterday's last price (CITIC publishes no history, so the Worker records it)
-- Floors and ceilings are edited in the app, protected by a password
+- Private: the app asks for a password once per device; without it the API returns nothing
+- Floors and ceilings are edited in the app
 
 Prices come from the feed behind the public rate table on citicbank.com. They are for reference only; the price in the CITIC app when you trade is final.
 
@@ -41,7 +42,7 @@ Secrets (Cloudflare dashboard → fx-watch → Settings → Variables and Secret
 
 | Name | What |
 |---|---|
-| `EDIT_PASSWORD` | Password for changing floors and ceilings in the app |
+| `EDIT_PASSWORD` | Password to open the app (and change floors and ceilings) |
 | `TELEGRAM_BOT_TOKEN` | From @BotFather |
 | `TELEGRAM_CHAT_ID` | Your chat ID with the bot |
 

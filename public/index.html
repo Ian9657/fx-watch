@@ -3,66 +3,102 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f6f6f2" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#141614" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#12202b">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FX Watch">
+  <meta name="robots" content="noindex">
   <title>FX Watch</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon-512.png">
   <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:wght@600;700&family=Playfair+Display:wght@700&display=swap">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
 <body>
   <main>
-    <header>
-      <h1>FX Watch</h1>
-      <button id="refresh" class="refresh" aria-label="Refresh"><span id="updated">Loading…</span> ↻</button>
+    <header class="plate">
+      <div>
+        <h1>FX WATCH</h1>
+        <p class="caps small">CITIC BUY PRICE</p>
+      </div>
+      <button id="refresh" class="clock" aria-label="Refresh" hidden><span id="updated">—</span> ↻</button>
     </header>
 
     <p id="error" class="error" hidden></p>
 
-    <section class="cards">
-      <article class="card" data-pair="GBP">
-        <span class="pair">GBP · CITIC buy</span>
-        <span class="rate" id="rate-GBP">—</span>
-        <span class="change" id="change-GBP"></span>
-        <span class="quoted" id="quoted-GBP"></span>
-        <span class="limits" id="limits-GBP"></span>
-        <span class="state" id="state-GBP"></span>
-      </article>
-      <article class="card" data-pair="USD">
-        <span class="pair">USD · CITIC buy</span>
-        <span class="rate" id="rate-USD">—</span>
-        <span class="change" id="change-USD"></span>
-        <span class="quoted" id="quoted-USD"></span>
-        <span class="limits" id="limits-USD"></span>
-        <span class="state" id="state-USD"></span>
-      </article>
-    </section>
+    <!-- Shown until the password is entered on this device. -->
+    <form id="lock" class="lock" hidden>
+      <p class="caps">PRIVATE INSTRUMENT</p>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button type="submit" class="brass">UNLOCK</button>
+      <p id="lock-status" class="note" role="status"></p>
+    </form>
 
-    <section class="panel">
-      <h2>Alerts</h2>
-      <p class="muted">Telegram message when a price drops below its floor or rises above its ceiling. Leave empty to turn off.</p>
-      <form id="limits">
-        <div class="limit-grid">
-          <span></span><span class="col">Floor</span><span class="col">Ceiling</span>
-          <span>GBP</span>
-          <input id="floor-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="GBP floor">
-          <input id="ceiling-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="GBP ceiling">
-          <span>USD</span>
-          <input id="floor-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD floor">
-          <input id="ceiling-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD ceiling">
+    <div id="app" hidden>
+      <section class="gauge" data-pair="GBP" aria-labelledby="gbp-name">
+        <h2 id="gbp-name" class="caps">GBP → CNY <span class="zone" id="zone-GBP"></span></h2>
+        <svg class="dial" viewBox="0 0 330 185" role="img" aria-labelledby="gbp-name">
+          <circle cx="165" cy="165" r="158" class="rim"></circle>
+          <path d="M25,165 A140,140 0 0 1 82.7,51.7 L99.1,74.4 A112,112 0 0 0 53,165 Z" class="band-buy"></path>
+          <path d="M82.7,51.7 A140,140 0 0 1 247.3,51.7 L230.9,74.4 A112,112 0 0 0 99.1,74.4 Z" class="band-hold"></path>
+          <path d="M247.3,51.7 A140,140 0 0 1 305,165 L277,165 A112,112 0 0 0 230.9,74.4 Z" class="band-high"></path>
+          <g class="ticks">
+            <line x1="25" y1="165" x2="17" y2="165"></line><line x1="31.9" y1="121.7" x2="24.3" y2="119.3"></line><line x1="51.7" y1="82.7" x2="45.3" y2="78"></line><line x1="82.7" y1="51.7" x2="78" y2="45.3"></line><line x1="121.7" y1="31.9" x2="119.3" y2="24.3"></line><line x1="165" y1="25" x2="165" y2="17"></line><line x1="208.3" y1="31.9" x2="210.7" y2="24.3"></line><line x1="247.3" y1="51.7" x2="252" y2="45.3"></line><line x1="278.3" y1="82.7" x2="284.7" y2="78"></line><line x1="298.1" y1="121.7" x2="305.7" y2="119.3"></line><line x1="305" y1="165" x2="313" y2="165"></line>
+          </g>
+          <text x="84.8" y="124" class="label-light" transform="rotate(-63 84.8 124)">BUY</text>
+          <text x="165" y="96" class="label-dark">HOLD</text>
+          <text x="245.2" y="124" class="label-light" transform="rotate(63 245.2 124)">TOO HIGH</text>
+          <g class="needle" id="needle-GBP"><line x1="165" y1="165" x2="165" y2="40"></line></g>
+          <circle cx="165" cy="165" r="13" class="hub"></circle>
+          <circle cx="165" cy="165" r="5" class="hub-pin"></circle>
+        </svg>
+        <div class="limits"><span id="floor-GBP">Floor —</span><span id="ceiling-GBP">Ceiling —</span></div>
+        <div class="flaps" id="flaps-GBP" role="img" aria-label="—"></div>
+        <p class="note" id="note-GBP"></p>
+      </section>
+
+      <hr>
+
+      <section class="gauge small-gauge" data-pair="USD" aria-labelledby="usd-name">
+        <svg class="dial" viewBox="0 0 330 185" role="img" aria-labelledby="usd-name">
+          <circle cx="165" cy="165" r="158" class="rim"></circle>
+          <path d="M25,165 A140,140 0 0 1 82.7,51.7 L99.1,74.4 A112,112 0 0 0 53,165 Z" class="band-buy"></path>
+          <path d="M82.7,51.7 A140,140 0 0 1 247.3,51.7 L230.9,74.4 A112,112 0 0 0 99.1,74.4 Z" class="band-hold"></path>
+          <path d="M247.3,51.7 A140,140 0 0 1 305,165 L277,165 A112,112 0 0 0 230.9,74.4 Z" class="band-high"></path>
+          <g class="needle" id="needle-USD"><line x1="165" y1="165" x2="165" y2="40"></line></g>
+          <circle cx="165" cy="165" r="18" class="hub"></circle>
+        </svg>
+        <div class="readout">
+          <h2 id="usd-name" class="caps">USD → CNY <span class="zone" id="zone-USD"></span></h2>
+          <div class="flaps flaps-small" id="flaps-USD" role="img" aria-label="—"></div>
+          <p class="note" id="note-USD"></p>
         </div>
-        <label id="password-row" hidden>Password <input id="password" type="password" autocomplete="current-password"></label>
-        <button type="submit" class="save">Save</button>
-        <p class="muted small"><span id="form-status" role="status"></span> <button type="button" id="test" class="link">Send a test message</button></p>
-      </form>
-    </section>
+      </section>
 
-    <footer class="muted">CITIC Bank customer buy price, for reference. The price in the CITIC app is final.</footer>
+      <button id="toggle-settings" class="brass" aria-expanded="false" aria-controls="settings">SET FLOOR &amp; CEILING</button>
+
+      <form id="settings" class="settings" hidden>
+        <p class="note">A Telegram message when a price drops below its floor or rises above its ceiling. Leave empty to turn off.</p>
+        <div class="limit-grid">
+          <span></span><span class="caps small">FLOOR</span><span class="caps small">CEILING</span>
+          <span class="caps">GBP</span>
+          <input id="floor-input-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="GBP floor">
+          <input id="ceiling-input-GBP" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="GBP ceiling">
+          <span class="caps">USD</span>
+          <input id="floor-input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD floor">
+          <input id="ceiling-input-USD" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Off" aria-label="USD ceiling">
+        </div>
+        <button type="submit" class="brass">SAVE</button>
+        <p class="note"><span id="form-status" role="status"></span> <button type="button" id="test" class="link">Send a test message</button></p>
+      </form>
+    </div>
+
+    <footer class="caps small">CITIC BANK CUSTOMER BUY PRICE · FOR REFERENCE</footer>
   </main>
 </body>
 </html>

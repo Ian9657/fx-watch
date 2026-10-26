@@ -65,6 +65,9 @@ async function check(env) {
 }
 
 async function api(request, env, path) {
+  // The whole app is private: every API call needs the password.
+  if (!(await authorized(request, env))) return json({ error: 'Locked' }, 401);
+
   if (path === '/api/rates') {
     const [quotes, daily] = await Promise.all([fetchCitic(), env.STORE.get('daily', 'json')]);
     // Previous close = last recorded price from an earlier Beijing day.
@@ -79,7 +82,6 @@ async function api(request, env, path) {
   }
 
   if (path === '/api/settings' && request.method === 'PUT') {
-    if (!(await authorized(request, env))) return json({ error: 'Wrong password' }, 401);
     const body = await request.json().catch(() => ({}));
     const limits = {};
     for (const p of PAIRS) {
@@ -105,7 +107,6 @@ async function api(request, env, path) {
   }
 
   if (path === '/api/test' && request.method === 'POST') {
-    if (!(await authorized(request, env))) return json({ error: 'Wrong password' }, 401);
     const [quotes, { limits }] = await Promise.all([fetchCitic(), load(env)]);
     await sendTelegram(env, testMessage(quotes, limits));
     return json({ ok: true });

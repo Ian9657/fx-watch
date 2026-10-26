@@ -242,35 +242,57 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   display: flex;
   justify-content: center;
   gap: 3px;
-  perspective: 300px;
+  perspective: 220px;
 }
-.flap {
+.tile {
+  position: relative;
   width: 32px;
   height: 48px;
   border-radius: 1px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font: 700 31px/1 'Playfair Display', Georgia, serif;
-  font-variant-numeric: lining-nums tabular-nums;
-  color: #f0e2bd;
-  background: linear-gradient(#3a3d40 0%, #2c2e31 49.5%, #08090a 49.5%, #08090a 50.5%, #26282a 50.5%, #303235 100%);
   box-shadow: 0 1px 0 #000, 0 0 0 1px #0b0c0d;
 }
-.flap.dot {
-  width: 9px;
-  background: none;
-  box-shadow: none;
-  align-items: flex-end;
-  padding-bottom: 7px;
-  font-size: 26px;
-  color: #c9a160;
+/* The seam where the two flaps meet */
+.tile::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  margin-top: -.5px;
+  background: #08090a;
+  box-shadow: 0 1px 0 rgba(255,255,255,.05);
+  z-index: 6;
 }
-.flap.flip { animation: flip 0.45s ease-out; }
-@keyframes flip {
-  0% { transform: rotateX(-90deg); }
-  60% { transform: rotateX(12deg); }
-  100% { transform: rotateX(0); }
+.half { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; backface-visibility: hidden; }
+.half.top { top: 0; border-radius: 1px 1px 0 0; background: linear-gradient(#3a3d40, #2c2e31); }
+.half.bottom { bottom: 0; border-radius: 0 0 1px 1px; background: linear-gradient(#26282a, #303235); }
+.ch {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 48px;
+  line-height: 50px;
+  text-align: center;
+  font: 700 31px 'Playfair Display', Georgia, serif;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: #f0e2bd;
+}
+.half.top .ch { top: 0; }
+.half.bottom .ch { top: -24px; }
+.fall { z-index: 4; transform-origin: 50% 100%; animation: fall .2s ease-in both; }
+.rise { z-index: 4; transform-origin: 50% 0; animation: rise .2s ease-out both; }
+/* The falling flap darkens as it tilts away from the light. */
+.fall::after { content: ''; position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.35)); }
+@keyframes fall { from { transform: rotateX(0); } to { transform: rotateX(-90deg); } }
+@keyframes rise { from { transform: rotateX(90deg); } to { transform: rotateX(0); } }
+.flap-dot {
+  align-self: flex-end;
+  width: 4px;
+  height: 4px;
+  margin: 0 2.5px 7px;
+  border-radius: 50%;
+  background: #c9a160;
 }
 
 /* Currency selector: a steel knob between two status lamps */
@@ -347,5 +369,5 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5
 @media (prefers-reduced-motion: reduce) {
   .needle, .knob-cap { transition: none; }
   .tremble { animation: none; }
-  .flap.flip { animation: none; }
+  .fall, .rise { animation-duration: 0s; }
 }

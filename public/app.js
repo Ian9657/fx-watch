@@ -172,17 +172,43 @@ function distance(price, { floor, ceiling }) {
   return 'No limits set';
 }
 
+// Split-flap digits. A changed digit flips like a real Solari board: the old
+// top half falls away, then the new bottom half drops into place. Digits
+// flip one after another, left to right.
 function drawFlaps(text) {
-  const box = $('flaps');
   const before = shown;
-  box.replaceChildren(...[...text].map((ch, i) => {
+  const half = (side, ch, extra = '') => {
     const el = document.createElement('span');
-    el.className = ch === '.' ? 'flap dot' : 'flap';
-    el.textContent = ch;
-    if (before && before[i] !== ch) el.classList.add('flip');
+    el.className = `half ${side} ${extra}`.trim();
+    const inner = document.createElement('span');
+    inner.className = 'ch';
+    inner.textContent = ch;
+    el.append(inner);
     return el;
+  };
+  let order = 0;
+  $('flaps').replaceChildren(...[...text].map((ch, i) => {
+    if (ch === '.') {
+      const dot = document.createElement('span');
+      dot.className = 'flap-dot';
+      return dot;
+    }
+    const tile = document.createElement('span');
+    tile.className = 'tile';
+    const prev = before ? before[i] : ch;
+    if (prev === ch) {
+      tile.append(half('top', ch), half('bottom', ch));
+    } else {
+      const delay = order++ * 90;
+      const fall = half('top', prev, 'fall');
+      const rise = half('bottom', ch, 'rise');
+      fall.style.animationDelay = `${delay}ms`;
+      rise.style.animationDelay = `${delay + 200}ms`;
+      tile.append(half('top', ch), half('bottom', prev), fall, rise);
+    }
+    return tile;
   }));
-  box.setAttribute('aria-label', text);
+  $('flaps').setAttribute('aria-label', text);
   shown = text;
 }
 

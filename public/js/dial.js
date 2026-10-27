@@ -30,9 +30,18 @@ export function renderStatus() {
   } else if (text === 'LIVE') {
     text += ` · ALERTS CHECKED ${time(new Date(lastCheck))}`;
   }
+  // Alerts that can't fire matter more than anything above.
+  const { failing, alertError } = state;
+  if (failing) {
+    level = 'error';
+    text = `ALERT CHECK FAILING · ${failing.count} IN A ROW`;
+  } else if (alertError && minutesAgo(alertError.time) < 24 * 60) {
+    level = 'error';
+    text = `TELEGRAM FAILED AT ${time(new Date(alertError.time))}`;
+  }
   $('refresh').className = `status ${level}`;
   $('status-text').textContent = text;
-  $('refresh').title = feedError || '';
+  $('refresh').title = failing?.error || alertError?.error || feedError || '';
 }
 
 // The dial maps a price range onto a half circle, 0 (far left) to 1 (far
@@ -94,6 +103,18 @@ function drawScale(price, { floor, ceiling }) {
     const [x, y] = point(pos, 98);
     return svgEl('text', { x: x.toFixed(1), y: (y + 3).toFixed(1) }, (lo + ((pos - 0.3) / 0.4) * (hi - lo)).toFixed(3));
   }));
+}
+
+// A side that has alerted stays quiet until the price is back inside its
+// limit by the re-arm margin; say so, with the price that re-arms it. Not
+// while the sheet is open, since the draft limits are what's on show.
+function alertNotes(p) {
+  const sent = state.alerted?.[p], { floor, ceiling } = state.limits[p], k = state.rearm;
+  if (!sent || state.draft) return [];
+  const notes = [];
+  if (floor != null && (sent.floor === floor || sent.floor === true)) notes.push(`floor alerted · re-arms above ${(floor * (1 + k)).toFixed(4)}`);
+  if (ceiling != null && (sent.ceiling === ceiling || sent.ceiling === true)) notes.push(`ceiling alerted · re-arms below ${(ceiling * (1 - k)).toFixed(4)}`);
+  return notes;
 }
 
 function zoneOf(price, { floor, ceiling }) {
@@ -190,7 +211,7 @@ export function render() {
       : { buy: '· BUY ·', high: '· TOO HIGH ·', hold: '· HOLD ·' }[zone] || '· ALERTS OFF ·';
     $('zone').className = `zone ${feedError ? '' : zone}`;
 
-    const parts = [distance(r.price, l)];
+    const parts = [...alertNotes(pair), distance(r.price, l)];
     if (r.previousClose) {
       const pct = ((r.price - r.previousClose) / r.previousClose) * 100;
       parts.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% today`);

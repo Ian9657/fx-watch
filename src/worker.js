@@ -1,4 +1,4 @@
-import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, DAY_TTL, dayKey, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage } from './logic.js';
+import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, DAY_TTL, dayKey, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
 
 // Two records, each with one writer, so neither can overwrite the other:
 // 'limits' is written only when you save settings, and 'data' (alert state
@@ -148,8 +148,10 @@ async function api(request, env, path) {
   }
 
   if (path === '/api/settings' && request.method === 'GET') {
-    const [{ limits, lastCheck }, rows] = await Promise.all([load(env), recentRows(env, 12)]);
-    return json({ limits, lastCheck, tape: tapeFrom(rows) });
+    const [{ limits, lastCheck, alerted, failing, alertError }, rows] = await Promise.all([load(env), recentRows(env, 12)]);
+    // Alert state too, so the page can say which alerts have fired and
+    // when they re-arm, and whether checks or sends are failing.
+    return json({ limits, lastCheck, tape: tapeFrom(rows), alerted, rearm: REARM, failing, alertError });
   }
 
   if (path === '/api/settings' && request.method === 'PUT') {

@@ -18,6 +18,10 @@ export const state = {
   lastGood: null,  // when this page last loaded prices successfully
   feedError: null, // message if the latest price load failed
   woundAt: 0,      // when the crown was last pressed (epoch ms)
+  alerted: null,   // per currency and side: the limit an alert was sent for, or false
+  rearm: 0.001,    // how far back inside a limit a sent alert re-arms (from the Worker)
+  failing: null,   // { since, count, error } while the 10-minute check keeps failing
+  alertError: null, // { time, error } if the last alert couldn't be sent
   pair: store.get('pair') === 'USD' ? 'USD' : 'GBP', // which currency the dial reads
   draft: null,     // { floor: { on, text }, ceiling: { on, text } } while the sheet is open
 };

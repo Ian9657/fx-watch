@@ -17,8 +17,8 @@ async function loadRates() {
 }
 
 async function loadSettings() {
-  const { limits, lastCheck, tape = [] } = await getJSON('/api/settings');
-  Object.assign(state, { limits, tape, lastCheck: lastCheck?.time ?? null });
+  const { limits, lastCheck, tape = [], alerted = null, rearm = 0.001, failing = null, alertError = null } = await getJSON('/api/settings');
+  Object.assign(state, { limits, tape, lastCheck: lastCheck?.time ?? null, alerted, rearm, failing, alertError });
 }
 
 let refreshing = false;

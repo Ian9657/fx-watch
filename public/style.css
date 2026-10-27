@@ -58,7 +58,7 @@ h1 { font-size: 16px; margin: 0; letter-spacing: 0.3em; color: #d8cfb8; }
 h2 { font-size: 14px; margin: 0; color: var(--muted); }
 .caps { margin: 0; }
 .small { font-size: 10px; color: var(--muted); letter-spacing: 0.15em; }
-.note { margin: 0; font-size: 14px; color: #a39c8a; text-align: center; }
+.note { margin: 0; font-size: 14px; color: #a39c8a; text-align: center; font-variant-numeric: lining-nums tabular-nums; }
 .error { margin: 0; color: var(--error); text-align: center; }
 
 button, input { font: inherit; color: inherit; }
@@ -367,7 +367,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .zone.buy { color: #7cc29d; }
 .zone.high { color: var(--error); }
 
-.limits { font-size: 16px; color: #d6ccb2; }
+.limits { font-size: 16px; color: #d6ccb2; font-variant-numeric: lining-nums tabular-nums; }
 
 /* Split-flap digits, set in the window on the lower half of the face */
 .flaps {
@@ -472,12 +472,12 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   border-radius: 50%;
   background:
     repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.07) 0 .6px, rgba(0,0,0,.08) .6px 1.4px),
-    conic-gradient(from 215deg, #d9dfe4, #7b848c 14%, #3a4148 26%, #a3acb4 40%, #e3e8ec 52%, #6c757d 66%, #30363c 78%, #959ea6 90%, #d9dfe4);
+    conic-gradient(from 315deg, #d9dfe4, #7b848c 14%, #3a4148 26%, #a3acb4 40%, #e3e8ec 52%, #6c757d 66%, #30363c 78%, #959ea6 90%, #d9dfe4);
   box-shadow: inset 1px 1px 0 rgba(255,255,255,.55), inset -1px -1px 0 rgba(0,0,0,.6), 0 0 0 1px #0b0e11;
-  transform: rotate(-48deg);
-  transition: transform .55s cubic-bezier(.3, 1.35, .5, 1);
 }
-.knob.usd .knob-cap { transform: rotate(48deg); }
+/* Only the mark turns: the light on the cap's grain stays where it is,
+   upper left like the dial's, as it would on a real knob. */
+.knob.usd .knob-mark { transform: rotate(48deg); }
 .knob { transition: transform .1s, box-shadow .1s; }
 .knob.pressed { transform: translateY(2px); box-shadow: 0 1px 0 #05080b, 0 3px 5px rgba(0,0,0,.4), inset 1px 1px 0 rgba(255,255,255,.18), inset -1px -1px 0 rgba(0,0,0,.8); }
 .knob-mark {
@@ -489,6 +489,9 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   margin-left: -1px;
   background: #14181c;
   box-shadow: 1px 0 0 rgba(255,255,255,.45);
+  transform-origin: 50% 22px; /* the cap's centre */
+  transform: rotate(-48deg);
+  transition: transform .55s cubic-bezier(.3, 1.35, .5, 1);
 }
 
 /* Settings sheet: slides up from the bottom, number wheels for each limit */
@@ -629,7 +632,7 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #958
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .needle, .knob-cap, .crown svg, .gauge { transition: none; }
+  .needle, .knob-mark, .crown svg, .gauge { transition: none; }
   .crown.pressed .crown-knurl, .status.winding .lamp, .scale .flip-in { animation: none; }
   .tremble { animation: none; }
   .fall, .rise { animation-duration: 0s; }

@@ -1,6 +1,6 @@
 // Start-up: load prices and settings, keep them fresh, and handle the
 // password lock. The parts of the page live in their own modules.
-import { $, store, state, getJSON, Locked, showError, lock, unlock, pressable } from './shared.js';
+import { $, store, state, getJSON, Locked, showError, lock, unlock, pressable, sound } from './shared.js';
 import { buildFace, render, renderStatus } from './dial.js';
 import { loadHistory, turned } from './back.js';
 import './sheet.js';
@@ -68,7 +68,7 @@ async function wind() {
   state.woundAt = Date.now();
   renderStatus();
 }
-pressable($('crown'), () => navigator.vibrate?.(8));
+pressable($('crown'), () => { navigator.vibrate?.(8); sound('ratchet'); });
 $('crown').addEventListener('click', () => {
   store.set('wound', '1');
   $('crown-hint').hidden = true;

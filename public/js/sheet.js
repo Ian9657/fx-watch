@@ -1,7 +1,7 @@
 // The settings sheet: number wheels for the floor and ceiling. While it's
 // open the dial previews the draft, so you can see where a new floor or
 // ceiling would sit before saving.
-import { $, SIDES, state, getJSON, Locked, lock, draftLimits, crossed, pressable } from './shared.js';
+import { $, SIDES, state, getJSON, Locked, lock, draftLimits, crossed, pressable, sound } from './shared.js';
 import { render } from './dial.js';
 
 // Each wheel is a drum with the ten digits round its rim. Its position is
@@ -12,32 +12,6 @@ const NOTCH = 24;                                          // px of drag per not
 const STEP = 36;                                           // degrees per digit
 const RADIUS = 16 / Math.tan((STEP / 2) * Math.PI / 180); // a 32px face per digit
 const mod10 = n => ((n % 10) + 10) % 10;
-
-// A soft tick for each notch the wheel passes, quieter for ones it passes
-// quickly; a lower clack for a lever. Web audio, so it follows the phone's
-// silent switch where the browser allows (audioSession).
-let audio;
-function sound(kind, level = 1) {
-  try {
-    if (!audio) {
-      if (navigator.audioSession) navigator.audioSession.type = 'ambient';
-      audio = new AudioContext();
-    }
-    if (audio.state === 'suspended') audio.resume();
-    const t = audio.currentTime, len = kind === 'clack' ? 0.03 : 0.012;
-    const buf = audio.createBuffer(1, Math.ceil(audio.sampleRate * len), audio.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let n = 0; n < data.length; n++) data[n] = (Math.random() * 2 - 1) * Math.exp(-n / (data.length / 5));
-    const src = audio.createBufferSource(), band = audio.createBiquadFilter(), gain = audio.createGain();
-    src.buffer = buf;
-    band.type = 'bandpass';
-    band.frequency.value = kind === 'clack' ? 1400 : 3200;
-    band.Q.value = 1.2;
-    gain.gain.value = (kind === 'clack' ? 0.5 : 0.28) * level;
-    src.connect(band).connect(gain).connect(audio.destination);
-    src.start(t);
-  } catch {}
-}
 
 // Turn the drum to a position, either at once (following a finger) or
 // settling onto it with a small overshoot, like a detent dropping home.

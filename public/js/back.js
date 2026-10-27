@@ -1,6 +1,6 @@
 // The back of the watch: a round chart of the recorded price, the bezel
 // that sets its time span, and turning the watch over.
-import { $, PAIRS, store, state, getJSON, Locked, limitsFor, position } from './shared.js';
+import { $, PAIRS, store, state, getJSON, Locked, limitsFor, position, sound } from './shared.js';
 
 // ---- Chart ---------------------------------------------------------------
 // A circular chart recorder: the paper turns once per span, the pen sits at
@@ -201,6 +201,7 @@ function settleBezel(target) {
     store.set('chartDays', days);
     drawChart();
     navigator.vibrate?.(6);
+    sound('tick');
   }
   cancelAnimationFrame(turning);
   if (quiet.matches || !delta) { bezelDeg = target; return turnBezel(bezelDeg); }

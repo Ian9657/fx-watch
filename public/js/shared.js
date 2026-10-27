@@ -98,6 +98,41 @@ export function position(price, floor, ceiling, ref = price) {
   return Math.min(0.98, Math.max(0.02, pos));
 }
 
+// The watch's sounds, all short and quiet, made from a burst of filtered
+// noise: a tick for a wheel's notch or the bezel's click, a lower clack for
+// a lever or the knob's detent, and three ticks of the crown's ratchet,
+// in time with its knurling turning. Web audio, so it follows the phone's
+// silent switch where the browser allows (audioSession).
+const SOUNDS = {
+  tick: { freq: 3200, len: 0.012, gain: 0.28 },
+  clack: { freq: 1400, len: 0.03, gain: 0.5 },
+  ratchet: { freq: 2600, len: 0.012, gain: 0.3, times: [0, 0.107, 0.213] },
+};
+let audio;
+export function sound(kind, level = 1) {
+  try {
+    if (!audio) {
+      if (navigator.audioSession) navigator.audioSession.type = 'ambient';
+      audio = new AudioContext();
+    }
+    if (audio.state === 'suspended') audio.resume();
+    const { freq, len, gain, times = [0] } = SOUNDS[kind];
+    const buf = audio.createBuffer(1, Math.ceil(audio.sampleRate * len), audio.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let n = 0; n < data.length; n++) data[n] = (Math.random() * 2 - 1) * Math.exp(-n / (data.length / 5));
+    for (const at of times) {
+      const src = audio.createBufferSource(), band = audio.createBiquadFilter(), amp = audio.createGain();
+      src.buffer = buf;
+      band.type = 'bandpass';
+      band.frequency.value = freq;
+      band.Q.value = 1.2;
+      amp.gain.value = gain * level;
+      src.connect(band).connect(amp).connect(audio.destination);
+      src.start(audio.currentTime + at);
+    }
+  } catch {}
+}
+
 // Phones don't show :active, so controls get a .pressed class from the
 // pointer instead, held for at least 140ms so even a quick tap shows.
 export function pressable(el, onPress) {

@@ -1,6 +1,6 @@
 // The front of the watch: the dial, the digit window, the status line and
 // the currency knob.
-import { $, PAIRS, store, state, time, limitsFor, span, position, pressable } from './shared.js';
+import { $, PAIRS, store, state, time, limitsFor, span, position, pressable, sound } from './shared.js';
 import { drawTape } from './tape.js';
 import { drawChart, turned } from './back.js';
 
@@ -236,5 +236,5 @@ document.querySelectorAll('.pick').forEach(b => {
   pressable(b);
   b.addEventListener('click', () => selectPair(b.dataset.pair));
 });
-pressable($('knob'), () => navigator.vibrate?.(6));
+pressable($('knob'), () => { navigator.vibrate?.(6); sound('clack'); });
 $('knob').addEventListener('click', () => selectPair(state.pair === 'GBP' ? 'USD' : 'GBP'));

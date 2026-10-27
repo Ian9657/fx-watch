@@ -559,6 +559,16 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 #toggle-settings { margin-top: auto; }
 footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5a4e; letter-spacing: 0.2em; }
 
+/* Short screens (an iPhone SE): tighter spacing, so the watch can stay
+   bigger and the page still fits. */
+@media (max-height: 720px) {
+  main { padding-top: max(10px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  #app { gap: 6px; }
+  .masthead { padding-bottom: 6px; }
+  .turn-hint { margin-top: 6px; }
+  footer.small { margin-top: 4px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .needle, .knob-cap { transition: none; }
   .tremble { animation: none; }

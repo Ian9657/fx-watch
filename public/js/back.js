@@ -88,7 +88,7 @@ export function drawChart() {
   out.push(`<text class="seam-label" x="${C + 5}" y="${C - R_LABEL + 3}" text-anchor="start">START ▸</text>`);
 
   const spanName = days === 1 ? '24 HOURS' : `${days} DAYS`;
-  let change = '—';
+  let change = '—', since = '';
   if (rows.length) {
     const prices = rows.map(r => r[col]);
     const { floor, ceiling } = limitsFor(pair);
@@ -123,6 +123,9 @@ export function drawChart() {
     out.push(`<path class="ink" d="${d}"/>`);
     const pct = (prices.at(-1) - prices[0]) / prices[0] * 100;
     change = `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(2)}%`;
+    // Recording began after the span's start: say when, as the change is
+    // only over that part.
+    if (rows[0][0] - t0 > GAP) since = `SINCE ${bj(rows[0][0]).getUTCDate()} ${MONTHS[bj(rows[0][0]).getUTCMonth()]}`;
     // The pen: a brass pointer, like the markers on the front, on the
     // latest point.
     const pr = Rv(prices.at(-1)), pd = A(rows.at(-1)[0]);
@@ -135,6 +138,7 @@ export function drawChart() {
   out.push(`<circle class="hub" cx="${C}" cy="${C}" r="${R_IN - 5}"/>`);
   out.push(`<text class="hub-span" x="${C}" y="${C - 6}">${spanName}</text>`);
   out.push(`<text class="hub-change" x="${C}" y="${C + 13}">${change}</text>`);
+  if (since) out.push(`<text class="hub-since" x="${C}" y="${C + 25}">${since}</text>`);
   $('polar').innerHTML = out.join('');
 }
 

@@ -252,6 +252,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .back .hub { fill: #151617; stroke: rgba(80,62,34,.55); stroke-width: 2.5; }
 .back .hub-span { font: 700 8.5px 'Cinzel', serif; fill: #d8c9a3; text-anchor: middle; letter-spacing: 2.5px; }
 .back .hub-change { font: 700 17px 'Playfair Display', Georgia, serif; fill: #f0e2bd; text-anchor: middle; font-variant-numeric: lining-nums; }
+.back .hub-since { font: 700 5.5px 'Cinzel', serif; fill: #a39c8a; text-anchor: middle; letter-spacing: 1.5px; }
 /* The bezel: brass like the front, turning anticlockwise in clicks, with
    one window at twelve onto a disc printed with the spans, like a date
    window. */

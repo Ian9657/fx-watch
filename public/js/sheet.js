@@ -4,24 +4,76 @@
 import { $, SIDES, state, getJSON, Locked, lock, draftLimits, crossed, pressable } from './shared.js';
 import { render } from './dial.js';
 
-const wheelCols = { floor: [], ceiling: [] };
-const DIGIT_H = 32;
-const colOffset = d => `translateY(${12 - d * DIGIT_H}px)`;
+// Each wheel is a drum with the ten digits round its rim. Its position is
+// counted in notches and never wraps, so 9 → 0 keeps turning forward; the
+// digit showing is that count mod 10.
+const wheels = { floor: [], ceiling: [] };
+const NOTCH = 24;                                          // px of drag per notch
+const STEP = 36;                                           // degrees per digit
+const RADIUS = 16 / Math.tan((STEP / 2) * Math.PI / 180); // a 32px face per digit
+const mod10 = n => ((n % 10) + 10) % 10;
 
-function setDigit(side, i, delta) {
+// A soft tick for each notch the wheel passes, quieter for ones it passes
+// quickly; a lower clack for a lever. Web audio, so it follows the phone's
+// silent switch where the browser allows (audioSession).
+let audio;
+function sound(kind, level = 1) {
+  try {
+    if (!audio) {
+      if (navigator.audioSession) navigator.audioSession.type = 'ambient';
+      audio = new AudioContext();
+    }
+    if (audio.state === 'suspended') audio.resume();
+    const t = audio.currentTime, len = kind === 'clack' ? 0.03 : 0.012;
+    const buf = audio.createBuffer(1, Math.ceil(audio.sampleRate * len), audio.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let n = 0; n < data.length; n++) data[n] = (Math.random() * 2 - 1) * Math.exp(-n / (data.length / 5));
+    const src = audio.createBufferSource(), band = audio.createBiquadFilter(), gain = audio.createGain();
+    src.buffer = buf;
+    band.type = 'bandpass';
+    band.frequency.value = kind === 'clack' ? 1400 : 3200;
+    band.Q.value = 1.2;
+    gain.gain.value = (kind === 'clack' ? 0.5 : 0.28) * level;
+    src.connect(band).connect(gain).connect(audio.destination);
+    src.start(t);
+  } catch {}
+}
+
+// Turn the drum to a position, either at once (following a finger) or
+// settling onto it with a small overshoot, like a detent dropping home.
+function place(wheel, pos, settle) {
+  wheel.pos = pos;
+  wheel.drum.style.transitionDelay = '';
+  wheel.drum.classList.toggle('settle', settle);
+  wheel.drum.style.transform = `translateZ(${-RADIUS}px) rotateX(${pos * STEP}deg)`;
+}
+
+// The digit showing changed: update the draft (and the dial's preview).
+function commit(side, i, wheel) {
   const { draft } = state;
+  const digit = String(mod10(Math.round(wheel.pos)));
   const chars = [...draft[side].text];
-  chars[i] = String((Number(chars[i]) + delta + 10) % 10);
+  if (chars[i] === digit) return;
+  chars[i] = digit;
   draft[side].text = chars.join('');
-  const wheel = wheelCols[side][i];
-  wheel.col.style.transform = colOffset(Number(chars[i]));
-  wheel.el.setAttribute('aria-valuenow', chars[i]);
+  wheel.el.setAttribute('aria-valuenow', digit);
   if (!draft[side].on) toggleSide(side);
   sheetChanged();
 }
 
-// Drag up to turn a wheel forward, down to turn it back; a tap on the top
-// half adds one, on the bottom half takes one away.
+function nudge(side, i, delta) {
+  const wheel = wheels[side][i];
+  cancelAnimationFrame(wheel.spin);
+  place(wheel, Math.round(wheel.pos) + delta, true);
+  sound('tick');
+  navigator.vibrate?.(4);
+  commit(side, i, wheel);
+}
+
+// Drag up to turn a wheel forward, down to turn it back; it follows the
+// finger and ticks at each notch. A quick flick carries on with momentum,
+// slowing as it goes (at most one turn); a new touch stops it. A tap on the
+// top half adds one, on the bottom half takes one away.
 function makeWheel(side, i, digit) {
   const el = document.createElement('div');
   el.className = 'wheel';
@@ -31,55 +83,73 @@ function makeWheel(side, i, digit) {
   el.setAttribute('aria-valuemax', '9');
   el.setAttribute('aria-valuenow', digit);
   el.setAttribute('aria-label', `${side} digit ${i + 1}`);
-  const col = document.createElement('div');
-  col.className = 'wheel-col';
-  col.append(...Array.from({ length: 10 }, (_, n) => Object.assign(document.createElement('span'), { textContent: n })));
-  col.style.transform = colOffset(Number(digit));
-  el.append(col);
-  wheelCols[side][i] = { el, col };
+  const drum = document.createElement('div');
+  drum.className = 'drum';
+  drum.append(...Array.from({ length: 10 }, (_, n) => {
+    const face = Object.assign(document.createElement('span'), { textContent: n });
+    face.style.transform = `rotateX(${-n * STEP}deg) translateZ(${RADIUS}px)`;
+    return face;
+  }));
+  el.append(drum);
+  const wheel = wheels[side][i] = { el, drum, pos: 0, spin: 0 };
+  place(wheel, Number(digit), false);
 
-  // Each 24px of travel is one click of the wheel. A quick flick carries on
-  // with momentum, slowing as it goes (at most one turn); a new touch stops it.
-  let startY = 0, lastY = 0, moved = false, spin = 0, track = [];
-  const click = delta => { setDigit(side, i, delta); navigator.vibrate?.(4); };
+  let startY = 0, startPos = 0, moved = false, track = [], notch = 0;
+  // Follow to a new position, ticking for each notch crossed.
+  const follow = (pos, speed = 0) => {
+    place(wheel, pos, false);
+    const n = Math.round(pos);
+    if (n === notch) return;
+    notch = n;
+    sound('tick', speed > 1.5 ? 0.6 : 1);
+    navigator.vibrate?.(4);
+    commit(side, i, wheel);
+  };
   el.addEventListener('pointerdown', e => {
-    cancelAnimationFrame(spin);
+    cancelAnimationFrame(wheel.spin);
     el.setPointerCapture(e.pointerId);
-    startY = lastY = e.clientY;
+    startY = e.clientY;
+    startPos = wheel.pos;
+    notch = Math.round(wheel.pos);
     moved = false;
     track = [{ y: e.clientY, t: e.timeStamp }];
+    place(wheel, wheel.pos, false); // stop any settling where it is
   });
   el.addEventListener('pointermove', e => {
     if (!el.hasPointerCapture(e.pointerId)) return;
     if (Math.abs(e.clientY - startY) > 6) moved = true;
     track.push({ y: e.clientY, t: e.timeStamp });
-    while (lastY - e.clientY >= 24) { click(1); lastY -= 24; }
-    while (e.clientY - lastY >= 24) { click(-1); lastY += 24; }
+    if (moved) follow(startPos + (startY - e.clientY) / NOTCH);
   });
   el.addEventListener('pointerup', e => {
     if (!moved) {
       const box = el.getBoundingClientRect();
-      return click(e.clientY < box.top + box.height / 2 ? 1 : -1);
+      return nudge(side, i, e.clientY < box.top + box.height / 2 ? 1 : -1);
     }
-    // Speed over the last 80ms, upward positive, in px per ms.
+    // Speed over the last 80ms, upward positive, in notches per ms.
     const recent = track.filter(p => e.timeStamp - p.t < 80);
-    if (recent.length < 2) return;
-    let v = (recent[0].y - recent.at(-1).y) / Math.max(1, recent.at(-1).t - recent[0].t);
-    if (Math.abs(v) < 0.3) return;
-    let carried = 0, clicks = 0, then = performance.now();
+    let v = recent.length < 2 ? 0
+      : (recent[0].y - recent.at(-1).y) / Math.max(1, recent.at(-1).t - recent[0].t) / NOTCH;
+    if (Math.abs(v) < 0.3 / NOTCH) return place(wheel, Math.round(wheel.pos), true);
+    const limit = wheel.pos + Math.sign(v) * 10;
+    let then = performance.now();
     const step = now => {
       const dt = now - then;
       then = now;
-      carried += v * dt;
+      let pos = wheel.pos + v * dt;
       v *= Math.exp(-dt / 220); // friction
-      while (Math.abs(carried) >= 24 && clicks < 10) { click(Math.sign(carried)); carried -= 24 * Math.sign(carried); clicks++; }
-      if (Math.abs(v) > 0.05 && clicks < 10) spin = requestAnimationFrame(step);
+      const done = Math.abs(v) < 0.05 / NOTCH || Math.sign(v) * (pos - limit) >= 0;
+      if (done) pos = Math.sign(v) > 0 ? Math.min(pos, limit) : Math.max(pos, limit);
+      follow(pos, Math.abs(v) * 1000);
+      if (done) place(wheel, Math.round(pos), true);
+      else wheel.spin = requestAnimationFrame(step);
     };
-    spin = requestAnimationFrame(step);
+    wheel.spin = requestAnimationFrame(step);
   });
+  el.addEventListener('pointercancel', () => place(wheel, Math.round(wheel.pos), true));
   el.addEventListener('keydown', e => {
-    if (e.key === 'ArrowUp') { e.preventDefault(); setDigit(side, i, 1); }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setDigit(side, i, -1); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); nudge(side, i, 1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); nudge(side, i, -1); }
   });
   return el;
 }
@@ -89,12 +159,18 @@ function makeWheel(side, i, digit) {
 function setSide(side, text) {
   const { draft } = state;
   draft[side].text = text;
+  // Each drum rolls forward to its new digit, the right-hand ones a beat
+  // later, like a counter being reset.
   [...text].forEach((ch, i) => {
-    const wheel = wheelCols[side][i];
+    const wheel = wheels[side][i];
     if (!wheel || ch === '.') return;
-    wheel.col.style.transform = colOffset(Number(ch));
+    cancelAnimationFrame(wheel.spin);
+    const ahead = mod10(Number(ch) - Math.round(wheel.pos));
+    place(wheel, Math.round(wheel.pos) + ahead, true);
+    wheel.drum.style.transitionDelay = `${i * 40}ms`;
     wheel.el.setAttribute('aria-valuenow', ch);
   });
+  sound('tick');
   if (!draft[side].on) toggleSide(side);
   else sheetChanged();
 }
@@ -252,8 +328,10 @@ pressable($('sheet-close'));
 pressable($('test'));
 $('sheet-close').addEventListener('click', closeSheet);
 $('sheet-backdrop').addEventListener('click', closeSheet);
-$('toggle-floor').addEventListener('click', () => toggleSide('floor'));
-$('toggle-ceiling').addEventListener('click', () => toggleSide('ceiling'));
+for (const side of SIDES) {
+  pressable($(`toggle-${side}`), () => navigator.vibrate?.(8));
+  $(`toggle-${side}`).addEventListener('click', () => { sound('clack'); toggleSide(side); });
+}
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.draft) closeSheet(); });
 
 $('settings').addEventListener('submit', async e => {

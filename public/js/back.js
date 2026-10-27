@@ -103,13 +103,17 @@ export function drawChart() {
     const Rv = v => R_IN + (v - lo) / (hi - lo) * (R_OUT - R_IN);
     for (const [side, v] of [['floor', floor], ['ceiling', ceiling]]) {
       if (v == null) continue;
+      // Each ring is named at its foot, so it doesn't rely on colour alone.
+      const name = side === 'floor' ? 'FLOOR' : 'CEILING';
       if (v > lo && v < hi) {
-        out.push(`<circle class="limit ${side}" cx="${C}" cy="${C}" r="${Rv(v)}"/>`);
+        const r = Rv(v);
+        out.push(`<circle class="limit ${side}" cx="${C}" cy="${C}" r="${r}"/>`);
+        out.push(`<text class="limit-name ${side}" x="${C}" y="${C + r + 2}">${name}</text>`);
       } else {
         const r = side === 'floor' ? R_IN : R_OUT;
         out.push(`<circle class="limit off ${side}" cx="${C}" cy="${C}" r="${r}"/>`);
         const [x, y] = polar(r + (side === 'floor' ? 9 : -7), 180);
-        out.push(`<text class="limit-tag ${side}" x="${x}" y="${y}">${side === 'floor' ? '↓' : '↑'} ${v.toFixed(4)}</text>`);
+        out.push(`<text class="limit-tag ${side}" x="${x}" y="${y}">${name} ${side === 'floor' ? '↓' : '↑'} ${v.toFixed(4)}</text>`);
       }
     }
     // Thinned rows sit `every` quotes apart, so only a longer pause is a gap.
@@ -132,7 +136,9 @@ export function drawChart() {
     const [px, py] = polar(pr, pd), [ax, ay] = polar(pr + 9, pd - 3.2), [bx, by] = polar(pr + 9, pd + 3.2);
     out.push(`<circle class="nib" cx="${px}" cy="${py}" r="2.2"/>`);
     out.push(`<path class="pen" d="M${px},${py - 2.5}L${ax},${ay}L${bx},${by}Z"/>`);
-    $('case').setAttribute('aria-label', `${pair} over the last ${spanWords(days)}: ${pct >= 0 ? 'up' : 'down'} ${Math.abs(pct).toFixed(2)}%.`);
+    const reading = `${pair} over the last ${spanWords(days)}: ${pct >= 0 ? 'up' : 'down'} ${Math.abs(pct).toFixed(2)}%.`;
+    $('case').setAttribute('aria-label', `${reading} Arrow keys change the span.`);
+    $('back-live').textContent = turned() ? reading : '';
   }
   // The hub: the span and the change across it, the key reading.
   out.push(`<circle class="hub" cx="${C}" cy="${C}" r="${R_IN - 5}"/>`);
@@ -280,8 +286,16 @@ $('case').addEventListener('pointerup', e => {
 $('case').addEventListener('click', () => {
   if (!swiped) turnOver();
 });
+// Keys: Enter or Space turns the watch over; on the back, the arrows turn
+// the bezel on to the next span, or round to the previous one (it only
+// turns one way, like the real thing).
 $('case').addEventListener('keydown', e => {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); turnOver(); }
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); turnOver(); return; }
+  if (!turned()) return;
+  const quarters = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: 3, ArrowUp: 3 }[e.key];
+  if (!quarters) return;
+  e.preventDefault();
+  settleBezel(Math.round(bezelDeg / 90) * 90 - 90 * quarters);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && turned() && !state.draft) turnOver(); });
 $('turn-hint').hidden = !!store.get('turned');

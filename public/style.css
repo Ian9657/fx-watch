@@ -10,6 +10,9 @@
 
 * { box-sizing: border-box; }
 
+/* Read by screen readers, not shown. */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
 /* One screen, no scrolling or rubber-band bounce: the watch is sized to the
    screen (js/app.js). If even the smallest watch can't fit, .tall lets the
    page scroll rather than hide anything. */
@@ -246,6 +249,9 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .back .limit-tag { font: 700 10px 'Cormorant Garamond', serif; text-anchor: middle; paint-order: stroke; stroke: #ece4d0; stroke-width: 3px; }
 .back .limit-tag.floor { fill: #3f6a4f; }
 .back .limit-tag.ceiling { fill: #8a3a2a; }
+.back .limit-name { font: 700 5.5px 'Cinzel', serif; letter-spacing: 1.5px; text-anchor: middle; dominant-baseline: middle; paint-order: stroke; stroke: #ece4d0; stroke-width: 2.5px; }
+.back .limit-name.floor { fill: #3f6a4f; }
+.back .limit-name.ceiling { fill: #8a3a2a; }
 .back .ink { fill: none; stroke: #43348a; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
 .back .nib { fill: #43348a; stroke: #f4eedf; stroke-width: .8; }
 .back .pen { fill: #8a6430; stroke: #4a3214; stroke-width: .6; }

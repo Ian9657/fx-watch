@@ -499,6 +499,11 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 }
 .sheet[hidden] { display: none; }
 @keyframes sheet-up { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+/* Pull the sheet down by its top (grip and title row) to close it. */
+.sheet-grip { align-self: center; width: 36px; height: 4px; margin: -8px 0 -4px; border-radius: 2px; background: #3a4650; }
+.sheet-grip, .sheet-head { touch-action: none; cursor: grab; }
+.sheet.dragging { animation: none; }
+.sheet.settling { transition: transform .22s cubic-bezier(.2, .9, .3, 1); }
 .sheet-head { display: flex; justify-content: space-between; align-items: baseline; }
 .sheet-head h2 { font-size: 13px; color: #d8cfb8; letter-spacing: 0.24em; }
 .sheet-hint { font-size: 13px; color: #7d7768; }

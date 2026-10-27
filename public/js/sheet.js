@@ -105,10 +105,45 @@ function openSheet() {
 
 function closeSheet() {
   state.draft = null;
+  // Ready to slide up afresh next time, wherever a pull left it.
+  $('settings').classList.remove('dragging', 'settling');
+  $('settings').style.transform = '';
   $('settings').hidden = true;
   $('sheet-backdrop').hidden = true;
   render();
   $('toggle-settings').focus({ preventScroll: true });
+}
+
+// Pull down by the top of the sheet to close it, as phone sheets do: it
+// follows the finger, closes past 80px or on a quick flick, and springs
+// back otherwise. The wheels keep their own up-and-down drags.
+let pull = null;
+const sheet = $('settings');
+const moveSheet = y => { sheet.style.transform = `translate(-50%, ${Math.max(0, y)}px)`; };
+for (const handle of [sheet.querySelector('.sheet-grip'), sheet.querySelector('.sheet-head')]) {
+  handle.addEventListener('pointerdown', e => {
+    pull = { y: e.clientY, t: Date.now() };
+    handle.setPointerCapture(e.pointerId);
+    sheet.classList.add('dragging');
+    sheet.classList.remove('settling');
+  });
+  handle.addEventListener('pointermove', e => { if (pull) moveSheet(e.clientY - pull.y); });
+  const release = e => {
+    if (!pull) return;
+    const dy = e.clientY - pull.y, fast = dy > 30 && dy / (Date.now() - pull.t) > 0.3;
+    pull = null;
+    sheet.classList.add('settling');
+    if (dy > 80 || fast) {
+      moveSheet(sheet.offsetHeight);
+      setTimeout(closeSheet, 220);
+    } else {
+      // Spring back; .dragging stays on so the opening slide doesn't replay.
+      moveSheet(0);
+      setTimeout(() => { sheet.classList.remove('settling'); sheet.style.transform = ''; }, 220);
+    }
+  };
+  handle.addEventListener('pointerup', release);
+  handle.addEventListener('pointercancel', release);
 }
 
 $('toggle-settings').addEventListener('click', openSheet);

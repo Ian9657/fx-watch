@@ -1,4 +1,4 @@
-import { PAIRS, SIDES, parseCitic, appendTape, appendHistory, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage } from './logic.js';
+import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, DAY_TTL, dayKey, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage } from './logic.js';
 
 // Two records, each with one writer, so neither can overwrite the other:
 // 'limits' is written only when you save settings, and 'data' (alert state
@@ -30,26 +30,50 @@ async function fetchCitic() {
   return parseCitic(await res.text());
 }
 
-// Keep the last price of each Beijing day (for the change vs. yesterday)
-// the last few quotes (for the ticker tape) and every quote for 90 days
-// (for the chart).
+const readDay = async (env, day) => (await env.STORE.get(dayKey(day), 'json')) || [];
+const writeDay = (env, day, rows) => env.STORE.put(dayKey(day), JSON.stringify(rows), { expirationTtl: DAY_TTL });
+
+// Add a new quote to today's history record: one write, and none when the
+// quote hasn't changed since the last check.
 async function record(env, quotes) {
   const t = Math.max(...PAIRS.map(p => quotes[p].time));
-  const sample = { t, ...Object.fromEntries(PAIRS.map(p => [p, quotes[p].price])) };
   const day = beijingDay(t * 1000);
-  const [daily, tape, history] = await Promise.all([
-    env.STORE.get('daily', 'json').then(v => v || []),
-    env.STORE.get('tape', 'json').then(v => v || []),
-    env.STORE.get('history', 'json').then(v => v || []),
-  ]);
-  if (daily.at(-1)?.t === t) return;
-  const next = daily.filter(d => d.d !== day);
-  next.push({ d: day, ...sample });
-  await Promise.all([
-    env.STORE.put('daily', JSON.stringify(next.slice(-30))),
-    env.STORE.put('tape', JSON.stringify(appendTape(tape, sample))),
-    env.STORE.put('history', JSON.stringify(appendHistory(history, sample))),
-  ]);
+  const rows = await readDay(env, day);
+  const next = appendRow(rows, toRow({ t, ...Object.fromEntries(PAIRS.map(p => [p, quotes[p].price])) }));
+  if (next !== rows) await writeDay(env, day, next);
+}
+
+// History used to be one record for all 90 days, with the last price of
+// each day and the tape kept separately. Move it into day records once.
+async function splitOldHistory(env) {
+  const old = await env.STORE.get('history', 'json');
+  if (!old) return;
+  for (const [day, rows] of Object.entries(splitByDay(old))) {
+    const have = await readDay(env, day);
+    const merged = [...rows, ...have].sort((a, b) => a[0] - b[0]).filter((r, i, all) => r[0] !== all[i - 1]?.[0]);
+    await writeDay(env, day, merged);
+  }
+  await Promise.all(['history', 'daily', 'tape'].map(key => env.STORE.delete(key)));
+}
+
+// The most recent rows before now: today's, and earlier days' if today has
+// fewer than `want` so far (quiet weekends included).
+async function recentRows(env, want) {
+  let rows = [];
+  for (const day of daysBack(beijingDay(Date.now()), 8)) {
+    rows = [...(await readDay(env, day)), ...rows];
+    if (rows.length >= want) break;
+  }
+  return rows;
+}
+
+// The last price recorded on an earlier Beijing day than today.
+async function previousClose(env) {
+  for (const day of daysBack(beijingDay(Date.now()), 8).slice(1)) {
+    const rows = await readDay(env, day);
+    if (rows.length) return rows.at(-1);
+  }
+  return null;
 }
 
 async function sendTelegram(env, text) {
@@ -73,6 +97,7 @@ const json = (body, status = 200) => Response.json(body, { status, headers: { 'C
 
 async function check(env) {
   const data = await load(env);
+  await splitOldHistory(env);
   const quotes = await fetchCitic();
   await record(env, quotes);
   const rates = Object.fromEntries(PAIRS.map(p => [p, quotes[p].price]));
@@ -93,20 +118,19 @@ async function api(request, env, path) {
   if (!(await authorized(request, env))) return json({ error: 'Locked' }, 401);
 
   if (path === '/api/rates') {
-    const [quotes, daily] = await Promise.all([fetchCitic(), env.STORE.get('daily', 'json')]);
-    // Previous close = last recorded price from an earlier Beijing day.
-    const today = beijingDay(Date.now());
-    const prev = (daily || []).filter(d => d.d < today).at(-1);
-    return json(Object.fromEntries(PAIRS.map(p => [p, { ...quotes[p], previousClose: prev?.[p] ?? null }])));
+    const [quotes, prev] = await Promise.all([fetchCitic(), previousClose(env)]);
+    return json(Object.fromEntries(PAIRS.map((p, i) => [p, { ...quotes[p], previousClose: prev?.[i + 1] ?? null }])));
   }
 
   if (path === '/api/history') {
-    return json({ history: (await env.STORE.get('history', 'json')) || [] });
+    const days = daysBack(beijingDay(Date.now()), HISTORY_DAYS + 1).reverse();
+    const history = (await Promise.all(days.map(day => readDay(env, day)))).flat();
+    return json({ history });
   }
 
   if (path === '/api/settings' && request.method === 'GET') {
-    const [{ limits, lastCheck }, tape] = await Promise.all([load(env), env.STORE.get('tape', 'json')]);
-    return json({ limits, lastCheck, tape: tape || [] });
+    const [{ limits, lastCheck }, rows] = await Promise.all([load(env), recentRows(env, 12)]);
+    return json({ limits, lastCheck, tape: tapeFrom(rows) });
   }
 
   if (path === '/api/settings' && request.method === 'PUT') {

@@ -24,7 +24,7 @@ One Cloudflare Worker:
 | Web app | `public/`, with one script module per part of the page in `public/js/` (dial, tape, back, settings sheet, shared state, start-up) |
 | API (`/api/rates`, `/api/history`, `/api/settings`, `/api/test`) | `src/worker.js` |
 | Parsing, alert rules, messages | `src/logic.js` |
-| Floors, ceilings, alert state, daily closing prices, ticker tape, 90-day price history | Workers KV (`STORE`) |
+| Floors and ceilings (`limits`), alert state and last check (`data`), and price history as one record per Beijing day (`h:YYYY-MM-DD`, expiring after 92 days); the tape and yesterday's close are read from the history | Workers KV (`STORE`) |
 | 10-minute check | Cron trigger in `wrangler.jsonc` |
 
 ## Develop

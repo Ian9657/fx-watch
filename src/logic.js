@@ -27,22 +27,39 @@ export function parseCitic(text) {
   return rates;
 }
 
-// The ticker tape: the last few quotes seen by the 10-minute check, newest
-// first. A check that sees the same quote as the last one adds nothing.
-export const TAPE_LENGTH = 12;
-export function appendTape(tape, sample) {
-  if (tape[0]?.t === sample.t) return tape;
-  return [sample, ...tape].slice(0, TAPE_LENGTH);
+// Price history is kept one record per Beijing day: [t, GBP, USD] rows,
+// oldest first, one per new quote the 10-minute check sees. A day holds at
+// most 144 rows (about 4 KB), so a check reads and writes only today's
+// record, and each record expires on its own after HISTORY_DAYS (+2 for
+// days that straddle the cut-off).
+export const HISTORY_DAYS = 90;
+export const DAY_TTL = (HISTORY_DAYS + 2) * 86400; // seconds
+export const dayKey = day => `h:${day}`;
+
+export const toRow = sample => [sample.t, ...PAIRS.map(p => +sample[p].toFixed(4))];
+
+// Add a row to a day's rows unless it repeats the last quote.
+export function appendRow(rows, row) {
+  return rows.at(-1)?.[0] === row[0] ? rows : [...rows, row];
 }
 
-// Price history for the chart: one [t, GBP, USD] row per new quote, oldest
-// first, kept for HISTORY_DAYS. Short rows and 4-decimal prices keep 90 days
-// small (about 0.5 MB).
-export const HISTORY_DAYS = 90;
-export function appendHistory(history, sample) {
-  if (history.at(-1)?.[0] === sample.t) return history;
-  const cutoff = sample.t - HISTORY_DAYS * 86400;
-  return [...history.filter(row => row[0] > cutoff), [sample.t, ...PAIRS.map(p => +sample[p].toFixed(4))]];
+// Group rows by Beijing day, for moving an older single history record over.
+export function splitByDay(rows) {
+  const days = {};
+  for (const row of rows) (days[beijingDay(row[0] * 1000)] ??= []).push(row);
+  return days;
+}
+
+// The ticker tape: the last TAPE_LENGTH quotes, newest first.
+export const TAPE_LENGTH = 12;
+export function tapeFrom(rows) {
+  return rows.slice(-TAPE_LENGTH).reverse().map(([t, ...prices]) => ({ t, ...Object.fromEntries(PAIRS.map((p, i) => [p, prices[i]])) }));
+}
+
+// The Beijing days from `from` back `n` days (YYYY-MM-DD, newest first).
+export function daysBack(from, n) {
+  const start = Date.parse(`${from}T00:00:00Z`);
+  return Array.from({ length: n }, (_, i) => new Date(start - i * 86400_000).toISOString().slice(0, 10));
 }
 
 // Beijing calendar date (YYYY-MM-DD) for an epoch-ms timestamp.

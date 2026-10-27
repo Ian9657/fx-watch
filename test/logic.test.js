@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, appendTape, TAPE_LENGTH, appendHistory, HISTORY_DAYS, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage } from '../src/logic.js';
+import { parseCitic, TAPE_LENGTH, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage } from '../src/logic.js';
 
 const none = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
 const limits = (gbp, usd = {}) => ({
@@ -109,24 +109,26 @@ test('test message does not claim a limit was crossed', () => {
   assert.doesNotMatch(msg, /your (floor|ceiling)/);
 });
 
-test('ticker tape keeps the newest quotes first and skips repeats', () => {
-  let tape = [];
-  tape = appendTape(tape, { t: 1, GBP: 8.9 });
-  tape = appendTape(tape, { t: 2, GBP: 8.91 });
-  tape = appendTape(tape, { t: 2, GBP: 8.91 });
-  assert.deepEqual(tape.map(s => s.t), [2, 1]);
-  for (let t = 3; t < 30; t++) tape = appendTape(tape, { t });
-  assert.equal(tape.length, TAPE_LENGTH);
-  assert.equal(tape[0].t, 29);
+test('each new quote is added to the day once, rounded to 4 places', () => {
+  let rows = [];
+  rows = appendRow(rows, toRow({ t: 1, GBP: 8.934099999999999, USD: 6.6879 }));
+  const same = appendRow(rows, toRow({ t: 1, GBP: 8.9341, USD: 6.6879 }));
+  assert.equal(same, rows); // unchanged, so nothing to write
+  rows = appendRow(rows, toRow({ t: 2, GBP: 8.91, USD: 6.69 }));
+  assert.deepEqual(rows, [[1, 8.9341, 6.6879], [2, 8.91, 6.69]]);
 });
 
-test('price history keeps every new quote for 90 days, oldest first', () => {
-  const day = 86400;
-  let history = [];
-  history = appendHistory(history, { t: day, GBP: 8.9, USD: 7.1 });
-  history = appendHistory(history, { t: day, GBP: 8.9, USD: 7.1 });
-  history = appendHistory(history, { t: 2 * day, GBP: 8.91, USD: 7.12 });
-  assert.deepEqual(history, [[day, 8.9, 7.1], [2 * day, 8.91, 7.12]]);
-  history = appendHistory(history, { t: (HISTORY_DAYS + 1.5) * day, GBP: 9, USD: 7.2 });
-  assert.deepEqual(history.map(row => row[0]), [2 * day, (HISTORY_DAYS + 1.5) * day]);
+test('ticker tape is the newest quotes first', () => {
+  const rows = Array.from({ length: 30 }, (_, t) => [t, 8 + t / 100, 7]);
+  const tape = tapeFrom(rows);
+  assert.equal(tape.length, TAPE_LENGTH);
+  assert.deepEqual(tape[0], { t: 29, GBP: 8.29, USD: 7 });
+  assert.equal(tape.at(-1).t, 18);
+});
+
+test('old single history splits into Beijing days', () => {
+  // 15:59 and 16:01 UTC fall either side of Beijing midnight.
+  const a = Date.UTC(2026, 9, 26, 15, 59) / 1000, b = Date.UTC(2026, 9, 26, 16, 1) / 1000;
+  assert.deepEqual(Object.keys(splitByDay([[a, 1, 1], [b, 2, 2]])), ['2026-10-26', '2026-10-27']);
+  assert.deepEqual(daysBack('2026-03-01', 3), ['2026-03-01', '2026-02-28', '2026-02-27']);
 });

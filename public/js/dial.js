@@ -183,7 +183,7 @@ export function render() {
     document.querySelector(`.pick[data-pair="${p}"]`).setAttribute('aria-label', `${p}${zone ? `, ${zone === 'high' ? 'too high' : zone}` : ''}`);
   }
   $('knob').classList.toggle('usd', pair === 'USD');
-  $('pair-label').textContent = `${pair} → CNY`;
+  $('pair-label').textContent = `CNY PER ${pair}`;
 
   const r = rates[pair];
   const l = limitsFor(pair);
@@ -216,9 +216,9 @@ export function render() {
       const pct = ((r.price - r.previousClose) / r.previousClose) * 100;
       parts.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% today`);
     }
-    parts.push(`quoted ${time(new Date(r.time * 1000))}`);
+    parts.push(`CITIC quoted ${time(new Date(r.time * 1000))}`);
     $('note').textContent = parts.join(' · ');
-    $('gauge').setAttribute('aria-label', `${pair} to CNY ${r.price.toFixed(4)}, ${$('zone').textContent.replaceAll('·', '').trim()}`);
+    $('gauge').setAttribute('aria-label', `${r.price.toFixed(4)} CNY per ${pair}, ${$('zone').textContent.replaceAll('·', '').trim()}`);
   }
   renderStatus();
   drawTape();

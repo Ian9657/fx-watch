@@ -80,7 +80,7 @@ button { cursor: pointer; }
   align-items: baseline;
   padding: 2px 2px 9px;
 }
-.masthead .small { font-size: 9px; color: #7d7768; letter-spacing: 0.26em; }
+.masthead .small { font-size: 9px; color: #9a9382; letter-spacing: 0.26em; }
 /* A groove cut into the panel: one dark line, one faint light line. */
 .etched { height: 1px; background: #05080b; box-shadow: 0 1px 0 rgba(255,255,255,.05); }
 
@@ -94,7 +94,7 @@ button { cursor: pointer; }
   padding: 4px 8px;
   border: 0;
   background: none;
-  color: #7d7768;
+  color: #9a9382;
   font-size: 9px;
   letter-spacing: 0.2em;
 }
@@ -548,7 +548,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 
 .wheel-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .row-label { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 72px; font-size: 11px; color: #a39c8a; letter-spacing: 0.2em; }
-.to-now { margin-left: -6px; padding: 6px; border: 0; background: none; color: #8f8775; font: 700 7.5px 'Cinzel', serif; letter-spacing: .14em; }
+.to-now { margin-left: -6px; padding: 6px; border: 0; background: none; color: #a39c8a; font: 700 7.5px 'Cinzel', serif; letter-spacing: .14em; }
 .to-now.pressed { color: #e9e1cc; }
 @media (hover: hover) { .to-now:hover { color: #c9b896; } }
 .wheels {
@@ -607,7 +607,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .toggle[aria-pressed="true"] { color: #7cc29d; }
 
 #toggle-settings { margin-top: auto; }
-footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5a4e; letter-spacing: 0.2em; }
+footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #958f7e; letter-spacing: 0.2em; }
 
 /* Short screens (an iPhone SE): tighter spacing, so the watch can stay
    bigger and the page still fits. */

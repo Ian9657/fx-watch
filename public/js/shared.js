@@ -22,6 +22,7 @@ export const state = {
   rearm: 0.001,    // how far back inside a limit a sent alert re-arms (from the Worker)
   failing: null,   // { since, count, error } while the 10-minute check keeps failing
   alertError: null, // { time, error } if the last alert couldn't be sent
+  offlineAt: null, // when the answers on show were saved, if they're the offline copy (sw.js)
   pair: store.get('pair') === 'USD' ? 'USD' : 'GBP', // which currency the dial reads
   draft: null,     // { floor: { on, text }, ceiling: { on, text } } while the sheet is open
 };
@@ -38,6 +39,9 @@ export async function getJSON(url, options = {}) {
     ...options,
     headers: { ...options.headers, Authorization: `Bearer ${store.get('password') || ''}` },
   });
+  // The offline copy (sw.js) is marked with when it was saved.
+  const saved = res.headers.get('X-Offline');
+  state.offlineAt = saved ? Number(saved) : null;
   const body = await res.json().catch(() => ({}));
   if (res.status === 401) throw new Locked();
   if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);

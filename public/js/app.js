@@ -8,7 +8,7 @@ import './sheet.js';
 async function loadRates() {
   try {
     state.rates = await getJSON('/api/rates');
-    state.lastGood = Date.now();
+    if (!state.offlineAt) state.lastGood = Date.now();
     state.feedError = null;
   } catch (err) {
     if (err instanceof Locked) throw err;
@@ -99,6 +99,9 @@ function fit() {
 }
 addEventListener('resize', fit);
 document.fonts?.ready.then(fit);
+
+// Keep an offline copy, so the app opens without a connection (sw.js).
+navigator.serviceWorker?.register('/sw.js').catch(() => {});
 
 buildFace();
 if (store.get('password')) refreshAll().then(fit);

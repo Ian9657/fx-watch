@@ -11,6 +11,7 @@ Live at **[fx.etarc.net](https://fx.etarc.net)**. Works on iPhone and Mac as a h
 - Shows the change since yesterday's last price, and a ticker tape of the last few quotes for the currency on the dial (CITIC publishes no history, so the Worker records both)
 - Tap the watch to turn it over: the back is a round chart recorder of the price over 24 hours, 7, 30 or 90 days, with your floor and ceiling as rings. Turn the bezel to change the span, shown in the window at twelve
 - Private: the app asks for a password once per device; without it the API returns nothing
+- Works offline: a service worker (`public/sw.js`) keeps a copy of the app and the last answers, so with no connection it still opens and shows the last prices, marked OFFLINE
 - Floors and ceilings are set with number wheels in the app (drag or tap each digit); the dial previews the change before you save
 
 Prices come from the feed behind the public rate table on citicbank.com. They are for reference only; the price in the CITIC app when you trade is final.

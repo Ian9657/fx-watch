@@ -30,9 +30,13 @@ export function renderStatus() {
   } else if (text === 'LIVE') {
     text += ` · ALERTS CHECKED ${time(new Date(lastCheck))}`;
   }
-  // Alerts that can't fire matter more than anything above.
-  const { failing, alertError } = state;
-  if (failing) {
+  // Alerts that can't fire matter more than anything above; with no
+  // connection, the saved prices are all there is to go on.
+  const { failing, alertError, offlineAt } = state;
+  if (offlineAt) {
+    level = 'warn';
+    text = `OFFLINE · PRICES FROM ${time(new Date(offlineAt))}`;
+  } else if (failing) {
     level = 'error';
     text = `ALERT CHECK FAILING · ${failing.count} IN A ROW`;
   } else if (alertError && minutesAgo(alertError.time) < 24 * 60) {

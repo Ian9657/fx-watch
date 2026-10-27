@@ -1,6 +1,6 @@
 // The front of the watch: the dial, the digit window, the status line and
 // the currency knob.
-import { $, PAIRS, store, state, time, limitsFor, span, position } from './shared.js';
+import { $, PAIRS, store, state, time, limitsFor, span, position, pressable } from './shared.js';
 import { drawTape } from './tape.js';
 import { drawChart, turned } from './back.js';
 
@@ -43,7 +43,8 @@ export function renderStatus() {
     level = 'error';
     text = `TELEGRAM FAILED AT ${time(new Date(alertError.time))}`;
   }
-  $('refresh').className = `status ${level}`;
+  if (state.winding) text = 'WINDING…';
+  $('refresh').className = `status ${level}${state.winding ? ' winding' : ''}`;
   $('status-text').textContent = text;
   $('refresh').title = failing?.error || alertError?.error || feedError || '';
 }
@@ -221,5 +222,9 @@ function selectPair(next) {
   render();
 }
 
-document.querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => selectPair(b.dataset.pair)));
+document.querySelectorAll('.pick').forEach(b => {
+  pressable(b);
+  b.addEventListener('click', () => selectPair(b.dataset.pair));
+});
+pressable($('knob'), () => navigator.vibrate?.(6));
 $('knob').addEventListener('click', () => selectPair(state.pair === 'GBP' ? 'USD' : 'GBP'));

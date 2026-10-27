@@ -16,7 +16,7 @@
   color-scheme: dark;
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 /* Read by screen readers, not shown. */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -92,6 +92,10 @@ button { cursor: pointer; }
 }
 .status[hidden] { display: none; }
 .status:disabled { cursor: wait; }
+.status.pressed { opacity: .6; }
+/* Winding: the lamp pulses until the new prices are in. */
+.status.winding .lamp { animation: winding .7s ease-in-out infinite alternate; }
+@keyframes winding { from { opacity: .25; } to { opacity: 1; } }
 .lamp {
   flex-shrink: 0;
   width: 6px;
@@ -119,7 +123,7 @@ button { cursor: pointer; }
   letter-spacing: 0.25em;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 0 0 1px #05080b, 0 1px 0 1px rgba(255,255,255,.04);
 }
-.btn:active { background: linear-gradient(#161d23, #1d262e); }
+.btn:active, .btn.pressed { background: linear-gradient(#161d23, #1d262e); }
 .link {
   padding: 0;
   border: 0;
@@ -204,7 +208,14 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .crown-wrap { position: relative; z-index: 0; margin: 14px 0 -12px; }
 .crown { display: block; width: 120px; height: 78px; padding: 0; border: 0; background: none; transition: transform .12s; }
 .crown svg { display: block; width: 100%; height: 100%; }
-.crown:active { transform: translateY(4px); }
+/* Pressed (.pressed, set by script so a phone shows it too): the crown
+   dips and its knurling rolls on a notch, as if winding. */
+.crown.pressed { transform: translateY(4px); }
+.crown.pressed .crown-knurl { animation: wind .32s steps(3) both; }
+@keyframes wind { to { transform: translateX(3px); } }
+/* Turning over: the bow and crown turn with the case. */
+.crown svg { transition: transform .8s cubic-bezier(.45, .05, .25, 1); }
+.gauge.over .crown svg { transform: perspective(600px) rotateY(180deg); }
 .crown-hint {
   position: absolute;
   left: 112px;
@@ -418,6 +429,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   color: #6b6556;
 }
 .pick[aria-pressed="true"] { color: var(--cream); }
+.pick.pressed { opacity: .6; }
 .pick .caps { font-size: 13px; letter-spacing: 0.22em; }
 .lamp-dot {
   width: 9px;
@@ -450,6 +462,8 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   transition: transform .55s cubic-bezier(.3, 1.35, .5, 1);
 }
 .knob.usd .knob-cap { transform: rotate(48deg); }
+.knob { transition: transform .1s, box-shadow .1s; }
+.knob.pressed { transform: translateY(2px); box-shadow: 0 1px 0 #05080b, 0 3px 5px rgba(0,0,0,.4), inset 1px 1px 0 rgba(255,255,255,.18), inset -1px -1px 0 rgba(0,0,0,.8); }
 .knob-mark {
   position: absolute;
   left: 50%;
@@ -564,7 +578,8 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .needle, .knob-cap { transition: none; }
+  .needle, .knob-cap, .crown svg { transition: none; }
+  .crown.pressed .crown-knurl, .status.winding .lamp { animation: none; }
   .tremble { animation: none; }
   .fall, .rise { animation-duration: 0s; }
   .sheet { animation: none; }

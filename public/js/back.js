@@ -230,6 +230,7 @@ let swiped = false, swipeX = null, dragging = false;
 // on the back, so the way back is never a guess.
 function turnOver() {
   const over = $('case').classList.toggle('over');
+  $('gauge').classList.toggle('over', over); // the bow and crown turn too
   if (over) {
     drawChart();
     loadHistory().then(drawChart, () => {}); // a lock shows on the next refresh

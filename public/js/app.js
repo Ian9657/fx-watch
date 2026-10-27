@@ -1,6 +1,6 @@
 // Start-up: load prices and settings, keep them fresh, and handle the
 // password lock. The parts of the page live in their own modules.
-import { $, store, state, getJSON, Locked, showError, lock, unlock } from './shared.js';
+import { $, store, state, getJSON, Locked, showError, lock, unlock, pressable } from './shared.js';
 import { buildFace, render, renderStatus } from './dial.js';
 import { loadHistory, turned } from './back.js';
 import './sheet.js';
@@ -58,15 +58,26 @@ $('lock').addEventListener('submit', async e => {
 
 // Pressing the crown winds the watch: refresh now. The hint shows until it's
 // been pressed once on this device.
-$('crown').addEventListener('click', async () => {
-  store.set('wound', '1');
-  $('crown-hint').hidden = true;
-  await refreshAll();
+// While it runs, the status line says WINDING… and its lamp pulses, for at
+// least 0.6s so a fast refresh still reads as winding, not a flicker.
+async function wind() {
+  state.winding = true;
+  renderStatus();
+  await Promise.all([refreshAll(), new Promise(r => setTimeout(r, 600))]);
+  state.winding = false;
   state.woundAt = Date.now();
   renderStatus();
+}
+pressable($('crown'), () => navigator.vibrate?.(8));
+$('crown').addEventListener('click', () => {
+  store.set('wound', '1');
+  $('crown-hint').hidden = true;
+  wind();
 });
 
-$('refresh').addEventListener('click', () => refreshAll());
+pressable($('refresh'));
+$('refresh').addEventListener('click', wind);
+document.querySelectorAll('.btn').forEach(b => pressable(b));
 
 // Home-screen apps have no reload button and iOS freezes them in the
 // background, so refresh on a timer and whenever the app comes back.

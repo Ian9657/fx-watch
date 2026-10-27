@@ -23,6 +23,7 @@ export const state = {
   failing: null,   // { since, count, error } while the 10-minute check keeps failing
   alertError: null, // { time, error } if the last alert couldn't be sent
   offlineAt: null, // when the answers on show were saved, if they're the offline copy (sw.js)
+  winding: false,  // a refresh you asked for (crown or status line) is under way
   pair: store.get('pair') === 'USD' ? 'USD' : 'GBP', // which currency the dial reads
   draft: null,     // { floor: { on, text }, ceiling: { on, text } } while the sheet is open
 };
@@ -95,4 +96,21 @@ export function position(price, floor, ceiling, ref = price) {
   const [lo, hi] = span(ref, floor, ceiling);
   const pos = 0.3 + (0.4 * (price - lo)) / (hi - lo);
   return Math.min(0.98, Math.max(0.02, pos));
+}
+
+// Phones don't show :active, so controls get a .pressed class from the
+// pointer instead, held for at least 140ms so even a quick tap shows.
+export function pressable(el, onPress) {
+  let since = 0, timer;
+  const release = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => el.classList.remove('pressed'), Math.max(0, 140 - (Date.now() - since)));
+  };
+  el.addEventListener('pointerdown', () => {
+    clearTimeout(timer);
+    since = Date.now();
+    el.classList.add('pressed');
+    onPress?.();
+  });
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(type, release);
 }

@@ -211,7 +211,8 @@
       <span class="sheet-grip" aria-hidden="true"></span>
       <div class="sheet-head">
         <h2 id="sheet-title" class="press">SET GBP LIMITS</h2>
-        <span class="sheet-hint press">drag or tap a wheel</span>
+        <span class="sheet-hint press">drag a wheel</span>
+        <button type="button" class="sheet-x" id="sheet-close" aria-label="Close">×</button>
       </div>
       <div class="wheel-row" id="row-floor">
         <span class="row-label caps press">FLOOR</span>
@@ -224,11 +225,11 @@
         <button type="button" class="toggle press" id="toggle-ceiling" aria-pressed="true" aria-label="Ceiling alert">ON</button>
       </div>
       <p class="note press" id="sheet-note">A Telegram message when the price drops below the floor or rises above the ceiling.</p>
-      <div class="sheet-actions">
-        <button type="button" class="btn press" id="sheet-close">Close</button>
-        <button type="submit" class="btn btn-strong press">Save</button>
+      <button type="submit" class="btn btn-strong press">Save</button>
+      <div class="sheet-foot">
+        <span class="note press" id="form-status" role="status"></span>
+        <button type="button" id="test" class="btn-small press">Send test message</button>
       </div>
-      <p class="note press"><span id="form-status" role="status"></span> <button type="button" id="test" class="link">Send a test message</button></p>
     </form>
 
     <footer class="caps small press">CITIC BANK CUSTOMER BUY PRICE · FOR REFERENCE</footer>

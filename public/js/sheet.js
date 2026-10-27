@@ -1,7 +1,7 @@
 // The settings sheet: number wheels for the floor and ceiling. While it's
 // open the dial previews the draft, so you can see where a new floor or
 // ceiling would sit before saving.
-import { $, SIDES, state, getJSON, Locked, lock, draftLimits, crossed } from './shared.js';
+import { $, SIDES, state, getJSON, Locked, lock, draftLimits, crossed, pressable } from './shared.js';
 import { render } from './dial.js';
 
 const wheelCols = { floor: [], ceiling: [] };
@@ -98,20 +98,39 @@ function openSheet() {
     draft[side].on = !draft[side].on; // toggleSide flips it back and syncs the button
     toggleSide(side);
   }
+  clearTimeout(closing);
+  $('sheet-backdrop').classList.remove('closing');
+  $('settings').classList.remove('closing', 'dragging', 'settling');
+  $('settings').style.transform = '';
   $('sheet-backdrop').hidden = false;
   $('settings').hidden = false;
   $('wheels-floor').querySelector('.wheel').focus({ preventScroll: true });
 }
 
+// Out: the sheet slides down (from wherever a pull left it) as the
+// backdrop fades, then both hide, ready to slide up afresh next time.
+const quiet = matchMedia('(prefers-reduced-motion: reduce)');
+let closing = 0;
 function closeSheet() {
+  if (!state.draft) return;
   state.draft = null;
-  // Ready to slide up afresh next time, wherever a pull left it.
-  $('settings').classList.remove('dragging', 'settling');
-  $('settings').style.transform = '';
-  $('settings').hidden = true;
-  $('sheet-backdrop').hidden = true;
-  render();
-  $('toggle-settings').focus({ preventScroll: true });
+  render(); // the dial drops the draft at once
+  const sheet = $('settings'), backdrop = $('sheet-backdrop');
+  const done = () => {
+    sheet.hidden = backdrop.hidden = true;
+    sheet.classList.remove('dragging', 'settling', 'closing');
+    backdrop.classList.remove('closing');
+    sheet.style.transform = '';
+    $('toggle-settings').focus({ preventScroll: true });
+  };
+  if (quiet.matches) return done();
+  sheet.classList.remove('settling');
+  sheet.classList.add('closing');
+  backdrop.classList.add('closing');
+  void sheet.offsetHeight; // start the slide from where the sheet is now
+  sheet.style.transform = `translate(-50%, ${sheet.offsetHeight + 20}px)`;
+  clearTimeout(closing);
+  closing = setTimeout(done, 280);
 }
 
 // Pull down by the top of the sheet to close it, as phone sheets do: it
@@ -122,6 +141,7 @@ const sheet = $('settings');
 const moveSheet = y => { sheet.style.transform = `translate(-50%, ${Math.max(0, y)}px)`; };
 for (const handle of [sheet.querySelector('.sheet-grip'), sheet.querySelector('.sheet-head')]) {
   handle.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return; // the × is a button, not a handle
     pull = { y: e.clientY, t: Date.now() };
     handle.setPointerCapture(e.pointerId);
     sheet.classList.add('dragging');
@@ -134,8 +154,7 @@ for (const handle of [sheet.querySelector('.sheet-grip'), sheet.querySelector('.
     pull = null;
     sheet.classList.add('settling');
     if (dy > 80 || fast) {
-      moveSheet(sheet.offsetHeight);
-      setTimeout(closeSheet, 220);
+      closeSheet();
     } else {
       // Spring back; .dragging stays on so the opening slide doesn't replay.
       moveSheet(0);
@@ -147,6 +166,8 @@ for (const handle of [sheet.querySelector('.sheet-grip'), sheet.querySelector('.
 }
 
 $('toggle-settings').addEventListener('click', openSheet);
+pressable($('sheet-close'));
+pressable($('test'));
 $('sheet-close').addEventListener('click', closeSheet);
 $('sheet-backdrop').addEventListener('click', closeSheet);
 $('toggle-floor').addEventListener('click', () => toggleSide('floor'));

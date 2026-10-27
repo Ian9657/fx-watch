@@ -130,13 +130,6 @@ button { cursor: pointer; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 0 0 1px #05080b, 0 1px 0 1px rgba(255,255,255,.04);
 }
 .btn:active, .btn.pressed { background: linear-gradient(#161d23, #1d262e); }
-.link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  text-decoration: underline;
-}
 
 /* Lock screen */
 .lock { display: flex; flex-direction: column; gap: 12px; margin-top: 40px; text-align: center; }
@@ -484,7 +477,10 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 }
 
 /* Settings sheet: slides up from the bottom, number wheels for each limit */
-.sheet-backdrop { position: fixed; inset: 0; z-index: 10; background: rgba(4,7,10,.6); }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 10; background: rgba(4,7,10,.6); animation: fade-in .25s ease-out both; }
+.sheet-backdrop.closing { animation: fade-out .28s ease-in both; }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
 .sheet-backdrop[hidden] { display: none; }
 .sheet {
   position: fixed;
@@ -499,25 +495,36 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   padding: 18px 20px max(20px, env(safe-area-inset-bottom));
   background: repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px), linear-gradient(#1d2730, #141c23);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 -1px 0 #05080b, 0 -10px 24px rgba(0,0,0,.55);
-  animation: sheet-up .35s cubic-bezier(.2, .9, .3, 1) both;
+  animation: sheet-up .42s cubic-bezier(.2, .9, .3, 1) both;
   /* On a short screen the sheet scrolls inside itself. */
   max-height: 100dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 .sheet[hidden] { display: none; }
-@keyframes sheet-up { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+/* In with a small overshoot, like a drawer pushed home; out with a quickening slide. */
+@keyframes sheet-up {
+  from { transform: translate(-50%, 100%); }
+  72% { transform: translate(-50%, -6px); }
+  to { transform: translate(-50%, 0); }
+}
+.sheet.closing { animation: none; transition: transform .28s cubic-bezier(.5, 0, .9, .5); }
 /* Pull the sheet down by its top (grip and title row) to close it. */
 .sheet-grip { align-self: center; width: 36px; height: 4px; margin: -8px 0 -4px; border-radius: 2px; background: #3a4650; }
 .sheet-grip, .sheet-head { touch-action: none; cursor: grab; }
 .sheet.dragging { animation: none; }
 .sheet.settling { transition: transform .22s cubic-bezier(.2, .9, .3, 1); }
-.sheet-head { display: flex; justify-content: space-between; align-items: baseline; }
+.sheet-head { display: flex; align-items: center; gap: 12px; }
+.sheet-head h2 { margin-right: auto; }
+.sheet-x { width: 32px; height: 32px; margin: -6px -8px -6px 0; padding: 0; border: 0; border-radius: 50%; background: none; color: #a39c8a; font: 400 24px/1 Georgia, serif; }
+.sheet-x:hover, .sheet-x.pressed { color: #e9e1cc; background: rgba(255,255,255,.06); }
+.sheet-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
+.btn-small { padding: 7px 12px; border: 0; border-radius: 2px; background: none; color: #a39c8a; font: 700 9px 'Cinzel', serif; letter-spacing: .18em; box-shadow: inset 0 0 0 1px #2c3640; }
+.btn-small.pressed { background: rgba(255,255,255,.05); color: #e9e1cc; }
 .sheet-head h2 { font-size: 13px; color: #d8cfb8; letter-spacing: 0.24em; }
 .sheet-hint { font-size: 13px; color: #7d7768; }
 .sheet .note { text-align: left; }
 .sheet .note.bad { color: var(--error); }
-.sheet-actions { display: flex; gap: 10px; }
 .btn-strong { background: linear-gradient(#2f3c47, #1f2830); color: #e9e1cc; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 0 0 1px #05080b; }
 
 .wheel-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -595,7 +602,9 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5
   .crown.pressed .crown-knurl, .status.winding .lamp, .scale .flip-in { animation: none; }
   .tremble { animation: none; }
   .fall, .rise { animation-duration: 0s; }
-  .sheet { animation: none; }
+  .sheet, .sheet-backdrop { animation: none; }
+  .sheet.closing { transition: none; }
+  .sheet-backdrop.closing { animation: none; }
   .tape-run, .tape-run .fresh, .turn-hint { animation: none; }
   .case { transition: none; }
   .wheel-col { transition: none; }

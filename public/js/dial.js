@@ -1,6 +1,6 @@
 // The front of the watch: the dial, the digit window, the status line and
 // the currency knob.
-import { $, PAIRS, store, state, time, limitsFor, span, position, pressable, sound } from './shared.js';
+import { $, PAIRS, store, state, time, limitsFor, span, position, pressable, sound, haptic } from './shared.js';
 import { drawTape } from './tape.js';
 import { drawChart, turned } from './back.js';
 
@@ -258,7 +258,7 @@ const knob = $('knob'), mark = knob.querySelector('.knob-mark');
 const STOP = 48; // degrees either side of the top
 function detent(next) {
   if (next === state.pair) return;
-  navigator.vibrate?.(6);
+  haptic(6);
   sound('clack');
   selectPair(next);
 }

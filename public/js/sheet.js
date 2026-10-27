@@ -1,7 +1,7 @@
 // The settings sheet: number wheels for the floor and ceiling. While it's
 // open the dial previews the draft, so you can see where a new floor or
 // ceiling would sit before saving.
-import { $, SIDES, state, getJSON, Locked, lock, draftLimits, crossed, pressable, sound } from './shared.js';
+import { $, SIDES, state, getJSON, Locked, lock, draftLimits, crossed, pressable, sound, haptic } from './shared.js';
 import { render } from './dial.js';
 
 // Each wheel is a drum with the ten digits round its rim. Its position is
@@ -40,7 +40,7 @@ function nudge(side, i, delta) {
   cancelAnimationFrame(wheel.spin);
   place(wheel, Math.round(wheel.pos) + delta, true);
   sound('tick');
-  navigator.vibrate?.(4);
+  haptic(4);
   commit(side, i, wheel);
 }
 
@@ -76,7 +76,7 @@ function makeWheel(side, i, digit) {
     if (n === notch) return;
     notch = n;
     sound('tick', speed > 1.5 ? 0.6 : 1);
-    navigator.vibrate?.(4);
+    haptic(4);
     commit(side, i, wheel);
   };
   el.addEventListener('pointerdown', e => {
@@ -303,7 +303,7 @@ pressable($('test'));
 $('sheet-close').addEventListener('click', closeSheet);
 $('sheet-backdrop').addEventListener('click', closeSheet);
 for (const side of SIDES) {
-  pressable($(`toggle-${side}`), () => navigator.vibrate?.(8));
+  pressable($(`toggle-${side}`), () => haptic(8));
   $(`toggle-${side}`).addEventListener('click', () => { sound('clack'); toggleSide(side); });
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.draft) closeSheet(); });

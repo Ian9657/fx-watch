@@ -133,6 +133,24 @@ export function sound(kind, level = 1) {
   } catch {}
 }
 
+// A tap felt through the fingertip. Android has the vibration API; iPhone
+// has none for web pages, but from iOS 18 Safari gives a switch control a
+// light tap when it flips, so a hidden one is flipped instead. Both only
+// work inside a touch or click, which is when this is called.
+let iosSwitch;
+export function haptic(ms = 6) {
+  if (navigator.vibrate) return void navigator.vibrate(ms);
+  if (!/iP(hone|ad|od)/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent))) return;
+  if (!iosSwitch) {
+    iosSwitch = document.createElement('label');
+    iosSwitch.setAttribute('aria-hidden', 'true');
+    iosSwitch.style.cssText = 'position:fixed;left:-100px;top:0;opacity:0;pointer-events:none';
+    iosSwitch.innerHTML = '<input type="checkbox" switch tabindex="-1">';
+    document.body.append(iosSwitch);
+  }
+  iosSwitch.click();
+}
+
 // Phones don't show :active, so controls get a .pressed class from the
 // pointer instead, held for at least 140ms so even a quick tap shows.
 export function pressable(el, onPress) {

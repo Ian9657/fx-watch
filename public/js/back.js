@@ -1,6 +1,6 @@
 // The back of the watch: a round chart of the recorded price, the bezel
 // that sets its time span, and turning the watch over.
-import { $, PAIRS, store, state, getJSON, Locked, limitsFor, position, sound } from './shared.js';
+import { $, PAIRS, store, state, getJSON, Locked, limitsFor, position, sound, haptic } from './shared.js';
 
 // ---- Chart ---------------------------------------------------------------
 // A circular chart recorder: the paper turns once per span, the pen sits at
@@ -200,7 +200,7 @@ function settleBezel(target) {
     days = span;
     store.set('chartDays', days);
     drawChart();
-    navigator.vibrate?.(6);
+    haptic(6);
     sound('tick');
   }
   cancelAnimationFrame(turning);
@@ -234,6 +234,10 @@ let hintTimer;
 function turnOver() {
   const over = $('case').classList.toggle('over');
   $('gauge').classList.toggle('over', over); // the bow and crown turn too
+  // Light runs across the glass as it turns.
+  $('gauge').classList.remove('glinting');
+  void $('gauge').offsetWidth;
+  $('gauge').classList.add('glinting');
   if (over) {
     drawChart();
     loadHistory().then(drawChart, () => {}); // a lock shows on the next refresh

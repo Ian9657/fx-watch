@@ -173,6 +173,21 @@ function drawFlaps(text) {
   shown = text;
 }
 
+// On first showing, the hand starts at rest at the far left and sweeps up
+// to the price, like an instrument waking; after that it simply follows.
+// (Two frames' wait, so the page has drawn it at rest before it moves.)
+let needleWoken = false, latest = 0;
+function turnNeedle(deg) {
+  const needle = $('needle');
+  latest = deg;
+  if (needleWoken) return void (needle.style.transform = `rotate(${deg}deg)`);
+  needleWoken = true;
+  needle.style.transform = 'rotate(-90deg)';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    setTimeout(() => { needle.style.transform = `rotate(${latest}deg)`; }, 150);
+  }));
+}
+
 export function render() {
   const { rates, feedError, pair } = state;
   for (const p of PAIRS) {
@@ -201,7 +216,7 @@ export function render() {
 
   if (r) {
     const deg = position(r.price, l.floor, l.ceiling) * 180 - 90;
-    $('needle').style.transform = `rotate(${deg}deg)`;
+    turnNeedle(deg);
     drawScale(r.price, l);
     drawFlaps(r.price.toFixed(4));
 
@@ -236,5 +251,43 @@ document.querySelectorAll('.pick').forEach(b => {
   pressable(b);
   b.addEventListener('click', () => selectPair(b.dataset.pair));
 });
-pressable($('knob'), () => { navigator.vibrate?.(6); sound('clack'); });
-$('knob').addEventListener('click', () => selectPair(state.pair === 'GBP' ? 'USD' : 'GBP'));
+// The knob: tap it to switch, or turn it. Turned, its mark follows the
+// finger across, and the currency changes with a click as the mark passes
+// the top, the detent between the two; let go and it settles at its stop.
+const knob = $('knob'), mark = knob.querySelector('.knob-mark');
+const STOP = 48; // degrees either side of the top
+function detent(next) {
+  if (next === state.pair) return;
+  navigator.vibrate?.(6);
+  sound('clack');
+  selectPair(next);
+}
+pressable(knob);
+let turn = null, turnedByDrag = false;
+knob.addEventListener('pointerdown', e => {
+  knob.setPointerCapture(e.pointerId);
+  turn = { x: e.clientX, from: state.pair === 'USD' ? STOP : -STOP, moved: false };
+});
+knob.addEventListener('pointermove', e => {
+  if (!turn) return;
+  const dx = e.clientX - turn.x;
+  if (!turn.moved && Math.abs(dx) < 6) return;
+  turn.moved = true;
+  const deg = Math.max(-STOP - 6, Math.min(STOP + 6, turn.from + dx * 1.6));
+  mark.classList.add('following');
+  mark.style.transform = `rotate(${deg}deg)`;
+  detent(deg > 0 ? 'USD' : 'GBP');
+});
+const letGo = () => {
+  if (!turn) return;
+  turnedByDrag = turn.moved;
+  turn = null;
+  mark.classList.remove('following');
+  mark.style.transform = ''; // back to its stop, by the class on the knob
+};
+knob.addEventListener('pointerup', letGo);
+knob.addEventListener('pointercancel', letGo);
+knob.addEventListener('click', () => {
+  if (turnedByDrag) return void (turnedByDrag = false);
+  detent(state.pair === 'GBP' ? 'USD' : 'GBP');
+});

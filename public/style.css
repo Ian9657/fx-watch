@@ -478,6 +478,8 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 /* Only the mark turns: the light on the cap's grain stays where it is,
    upper left like the dial's, as it would on a real knob. */
 .knob.usd .knob-mark { transform: rotate(48deg); }
+.knob-mark.following { transition: none; }
+.knob { touch-action: none; }
 .knob { transition: transform .1s, box-shadow .1s; }
 .knob.pressed { transform: translateY(2px); box-shadow: 0 1px 0 #05080b, 0 3px 5px rgba(0,0,0,.4), inset 1px 1px 0 rgba(255,255,255,.18), inset -1px -1px 0 rgba(0,0,0,.8); }
 .knob-mark {

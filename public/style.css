@@ -556,8 +556,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   align-items: center;
   gap: 4px;
   padding: 6px 8px;
-  /* The drums share a steel axle, seen in the gaps between them. */
-  background: linear-gradient(transparent calc(50% - 1.5px), #4d545b calc(50% - 1.5px), #c9ced3 50%, #3d434a calc(50% + 1.5px), transparent calc(50% + 1.5px)), #0b1014;
+  background: #0b1014;
   box-shadow: inset 0 2px 3px #000, 0 1px 0 rgba(255,255,255,.06);
   transition: opacity .2s;
 }

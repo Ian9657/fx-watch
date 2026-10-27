@@ -38,28 +38,65 @@ function makeWheel(side, i, digit) {
   el.append(col);
   wheelCols[side][i] = { el, col };
 
-  let startY = 0, lastY = 0, moved = false;
+  // Each 24px of travel is one click of the wheel. A quick flick carries on
+  // with momentum, slowing as it goes (at most one turn); a new touch stops it.
+  let startY = 0, lastY = 0, moved = false, spin = 0, track = [];
+  const click = delta => { setDigit(side, i, delta); navigator.vibrate?.(4); };
   el.addEventListener('pointerdown', e => {
+    cancelAnimationFrame(spin);
     el.setPointerCapture(e.pointerId);
     startY = lastY = e.clientY;
     moved = false;
+    track = [{ y: e.clientY, t: e.timeStamp }];
   });
   el.addEventListener('pointermove', e => {
     if (!el.hasPointerCapture(e.pointerId)) return;
     if (Math.abs(e.clientY - startY) > 6) moved = true;
-    while (lastY - e.clientY >= 24) { setDigit(side, i, 1); lastY -= 24; }
-    while (e.clientY - lastY >= 24) { setDigit(side, i, -1); lastY += 24; }
+    track.push({ y: e.clientY, t: e.timeStamp });
+    while (lastY - e.clientY >= 24) { click(1); lastY -= 24; }
+    while (e.clientY - lastY >= 24) { click(-1); lastY += 24; }
   });
   el.addEventListener('pointerup', e => {
-    if (moved) return;
-    const box = el.getBoundingClientRect();
-    setDigit(side, i, e.clientY < box.top + box.height / 2 ? 1 : -1);
+    if (!moved) {
+      const box = el.getBoundingClientRect();
+      return click(e.clientY < box.top + box.height / 2 ? 1 : -1);
+    }
+    // Speed over the last 80ms, upward positive, in px per ms.
+    const recent = track.filter(p => e.timeStamp - p.t < 80);
+    if (recent.length < 2) return;
+    let v = (recent[0].y - recent.at(-1).y) / Math.max(1, recent.at(-1).t - recent[0].t);
+    if (Math.abs(v) < 0.3) return;
+    let carried = 0, clicks = 0, then = performance.now();
+    const step = now => {
+      const dt = now - then;
+      then = now;
+      carried += v * dt;
+      v *= Math.exp(-dt / 220); // friction
+      while (Math.abs(carried) >= 24 && clicks < 10) { click(Math.sign(carried)); carried -= 24 * Math.sign(carried); clicks++; }
+      if (Math.abs(v) > 0.05 && clicks < 10) spin = requestAnimationFrame(step);
+    };
+    spin = requestAnimationFrame(step);
   });
   el.addEventListener('keydown', e => {
     if (e.key === 'ArrowUp') { e.preventDefault(); setDigit(side, i, 1); }
     if (e.key === 'ArrowDown') { e.preventDefault(); setDigit(side, i, -1); }
   });
   return el;
+}
+
+// Set a side's wheels to a whole value (e.g. the current price), turning
+// that side on if it was off.
+function setSide(side, text) {
+  const { draft } = state;
+  draft[side].text = text;
+  [...text].forEach((ch, i) => {
+    const wheel = wheelCols[side][i];
+    if (!wheel || ch === '.') return;
+    wheel.col.style.transform = colOffset(Number(ch));
+    wheel.el.setAttribute('aria-valuenow', ch);
+  });
+  if (!draft[side].on) toggleSide(side);
+  else sheetChanged();
 }
 
 function toggleSide(side) {
@@ -90,6 +127,7 @@ function openSheet() {
     return [side, { on: v != null, text: v != null ? v.toFixed(4) : start }];
   }));
   $('sheet-title').textContent = `SET ${pair} LIMITS`;
+  $('sheet-now').textContent = rates[pair] ? `NOW ${rates[pair].price.toFixed(4)}` : '';
   for (const side of SIDES) {
     $(`wheels-${side}`).replaceChildren(...[...draft[side].text].map((ch, i) => {
       if (ch === '.') return Object.assign(document.createElement('span'), { className: 'wheel-dot' });
@@ -200,6 +238,16 @@ for (const handle of [sheet.querySelector('.sheet-grip'), sheet.querySelector('.
 }
 
 $('toggle-settings').addEventListener('click', openSheet);
+// "Set to now": dial a side straight to the current price.
+for (const side of SIDES) {
+  const button = $(`now-${side}`);
+  pressable(button);
+  button.addEventListener('click', () => {
+    const price = state.rates[state.pair]?.price;
+    if (price) setSide(side, price.toFixed(4));
+  });
+}
+
 pressable($('sheet-close'));
 pressable($('test'));
 $('sheet-close').addEventListener('click', closeSheet);

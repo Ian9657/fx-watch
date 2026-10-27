@@ -85,6 +85,9 @@ test('parses the CITIC rate feed', () => {
   const rates = parseCitic(text);
   assert.equal(rates.GBP.price, 8.9587);
   assert.equal(rates.USD.price, 6.6929);
+  // No float noise: 893.41 / 100 would otherwise be 8.934099999999999.
+  const noisy = parseCitic('cb(' + JSON.stringify({ content: { resultList: [row('014001', '666.34', '668.79'), row('012001', '889.14', '893.41')] } }) + ')');
+  assert.equal(noisy.GBP.price, 8.9341);
   // 20:33:52 Beijing = 12:33:52 UTC
   assert.equal(new Date(rates.GBP.time * 1000).toISOString(), '2026-10-22T12:33:52.000Z');
   assert.throws(() => parseCitic('cb({"content":{"resultList":[]}})'));

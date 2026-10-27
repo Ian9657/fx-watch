@@ -17,7 +17,9 @@ export function parseCitic(text) {
   const rates = {};
   for (const pair of PAIRS) {
     const row = rows.find(r => r.curCode === CITIC_CODES[pair]);
-    const price = Number(row?.cstexcSellPrice) / 100;
+    // The feed gives CNY per 100 units; dividing leaves float noise
+    // (893.41 / 100 = 8.934099999999999), so round to the 4 places quoted.
+    const price = +(Number(row?.cstexcSellPrice) / 100).toFixed(4);
     if (!Number.isFinite(price) || price <= 0) throw new Error(`No CITIC price for ${pair}`);
     const [y, m, d] = row.quotePriceDate.match(/\d+/g).map(Number);
     const [hh, mm, ss] = row.quotePriceTime.split(':').map(Number);

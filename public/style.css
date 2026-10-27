@@ -203,7 +203,20 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 #app { display: flex; flex-direction: column; justify-content: space-evenly; gap: 14px; flex: 1; }
 #app[hidden] { display: none; }
 
-.gauge { display: flex; flex-direction: column; align-items: center; transform-origin: 50% 0; }
+.gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: 50% 0;
+  /* --fit sizes the watch to the screen (js/app.js); --lift-y and --lift-s
+     raise and shrink it above the settings sheet while that's open. */
+  transform: translateY(var(--lift-y, 0px)) scale(calc(var(--fit, 1) * var(--lift-s, 1)));
+  transition: transform .42s cubic-bezier(.2, .9, .3, 1);
+}
+/* With the sheet open, the watch sits above the dimmed page, bright, as the
+   live preview; it's only to look at then, not to tap. */
+.gauge.lifted { position: relative; z-index: 10; pointer-events: none; }
+.gauge.lowering { transition-duration: .28s; transition-timing-function: cubic-bezier(.5, 0, .9, .5); }
 
 /* Crown and bow above the case; the crown is a button that dips when pressed. */
 .crown-wrap { position: relative; z-index: 0; margin: 14px 0 -12px; }
@@ -479,7 +492,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 }
 
 /* Settings sheet: slides up from the bottom, number wheels for each limit */
-.sheet-backdrop { position: fixed; inset: 0; z-index: 10; background: rgba(4,7,10,.6); animation: fade-in .25s ease-out both; }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 9; background: rgba(4,7,10,.7); animation: fade-in .25s ease-out both; }
 .sheet-backdrop.closing { animation: fade-out .28s ease-in both; }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes fade-out { to { opacity: 0; } }
@@ -604,7 +617,7 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .needle, .knob-cap, .crown svg { transition: none; }
+  .needle, .knob-cap, .crown svg, .gauge { transition: none; }
   .crown.pressed .crown-knurl, .status.winding .lamp, .scale .flip-in { animation: none; }
   .tremble { animation: none; }
   .fall, .rise { animation-duration: 0s; }

@@ -94,7 +94,8 @@ window.addEventListener('focus', () => refreshAll());
 // anything off.
 function fit() {
   const gauge = $('gauge'), main = document.querySelector('main'), root = document.documentElement;
-  gauge.style.transform = gauge.style.marginBottom = '';
+  gauge.style.removeProperty('--fit');
+  gauge.style.marginBottom = '';
   root.classList.remove('tall');
   if ($('app').hidden) return;
   main.style.minHeight = '0'; // measure the content's own height
@@ -106,7 +107,7 @@ function fit() {
   const byHeight = (h - (over > 0 ? over : over / 2)) / h;
   const k = Math.max(0.6, Math.min(1.2, byWidth, byHeight));
   if (Math.abs(k - 1) < 0.005) return;
-  gauge.style.transform = `scale(${k.toFixed(3)})`;
+  gauge.style.setProperty('--fit', k.toFixed(3));
   gauge.style.marginBottom = `${((k - 1) * h).toFixed(1)}px`; // match the space to the new size
   root.classList.toggle('tall', main.scrollHeight > innerHeight + 1);
 }

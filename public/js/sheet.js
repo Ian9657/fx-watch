@@ -104,7 +104,39 @@ function openSheet() {
   $('settings').style.transform = '';
   $('sheet-backdrop').hidden = false;
   $('settings').hidden = false;
+  liftWatch();
   $('wheels-floor').querySelector('.wheel').focus({ preventScroll: true });
+}
+
+// While the sheet is open the watch rises (and shrinks if it must) to sit
+// whole in the space above it, bright over the dimmed page, so the dial's
+// live preview of the draft is in full view. It eases back as the sheet goes.
+function liftWatch() {
+  const gauge = $('gauge');
+  // Where the sheet will come to rest (it's still sliding in), and the
+  // space above it, clear of the status bar.
+  const sheetTop = innerHeight - $('settings').offsetHeight;
+  const statusBar = Math.max(0, parseFloat(getComputedStyle(document.querySelector('main')).paddingTop) - 26);
+  const margin = 14, above = statusBar + margin, below = sheetTop - margin;
+  // The watch from the top of its bow to the bottom of its case.
+  const top = gauge.querySelector('.crown').getBoundingClientRect().top;
+  const height = $('case').getBoundingClientRect().bottom - top;
+  const scale = Math.min(1, (below - above) / height);
+  // Scaling is about the top of the gauge, so the bow's offset scales too;
+  // then move it to sit centred in the space.
+  const gaugeTop = gauge.getBoundingClientRect().top;
+  const scaledTop = gaugeTop + (top - gaugeTop) * scale;
+  const wantTop = above + (below - above - height * scale) / 2;
+  gauge.classList.remove('lowering');
+  gauge.classList.add('lifted');
+  gauge.style.setProperty('--lift-y', `${(wantTop - scaledTop).toFixed(1)}px`);
+  gauge.style.setProperty('--lift-s', scale.toFixed(3));
+}
+function lowerWatch() {
+  const gauge = $('gauge');
+  gauge.classList.add('lowering');
+  gauge.style.removeProperty('--lift-y');
+  gauge.style.removeProperty('--lift-s');
 }
 
 // Out: the sheet slides down (from wherever a pull left it) as the
@@ -115,9 +147,11 @@ function closeSheet() {
   if (!state.draft) return;
   state.draft = null;
   render(); // the dial drops the draft at once
+  lowerWatch();
   const sheet = $('settings'), backdrop = $('sheet-backdrop');
   const done = () => {
     sheet.hidden = backdrop.hidden = true;
+    $('gauge').classList.remove('lifted', 'lowering');
     sheet.classList.remove('dragging', 'settling', 'closing');
     backdrop.classList.remove('closing');
     sheet.style.transform = '';

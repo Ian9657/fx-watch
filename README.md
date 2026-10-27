@@ -34,6 +34,7 @@ One Cloudflare Worker:
 echo 'EDIT_PASSWORD=localtest' > .dev.vars
 npm run dev     # http://localhost:8787
 npm test
+npm run check:screens  # with npm run dev running: six screen sizes in headless Chrome
 ```
 
 ## Deploy

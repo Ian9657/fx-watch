@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "npx wrangler@4 dev",
-    "test": "node --test"
+    "test": "node --test",
+    "check:screens": "node scripts/check-screens.mjs"
   }
 }

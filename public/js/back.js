@@ -225,9 +225,11 @@ function tilt(e) {
 // ---- Turning the watch over -----------------------------------------------
 // Tap or swipe the case to turn it over; on the back, the bezel turns. The
 // crown still winds (refreshes) on either side.
-let swiped = false, swipeX = null, dragging = false;
+let dragging = false, down = null, tapped = false;
 // The hint under the watch shows until you've turned it once, and always
-// on the back, so the way back is never a guess.
+// on the back, so the way back is never a guess. It changes halfway through
+// the turn, when the watch is edge-on.
+let hintTimer;
 function turnOver() {
   const over = $('case').classList.toggle('over');
   $('gauge').classList.toggle('over', over); // the bow and crown turn too
@@ -236,15 +238,22 @@ function turnOver() {
     loadHistory().then(drawChart, () => {}); // a lock shows on the next refresh
   }
   store.set('turned', '1');
-  $('turn-hint').textContent = over ? 'TAP THE CHART TO TURN BACK' : 'TAP THE WATCH TO TURN IT OVER';
-  $('turn-hint').classList.toggle('still', over);
-  $('turn-hint').hidden = !over;
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => {
+    $('turn-hint').textContent = over ? 'TAP THE CHART TO TURN BACK' : 'TAP THE WATCH TO TURN IT OVER';
+    $('turn-hint').classList.toggle('still', over);
+    $('turn-hint').hidden = !over;
+  }, quiet.matches ? 0 : 400);
 }
 export const turned = () => $('case').classList.contains('over');
 let grabDeg = 0, grabBezel = 0, moved = false;
+// Only a real tap turns the watch over (quick, and the finger barely
+// moved), or a quick sideways swipe; a press, a drag or a scroll doesn't.
+const BEZEL_FROM = 134; // the bezel takes pointers from just inside the paper's edge
 $('case').addEventListener('pointerdown', e => {
-  swiped = false;
-  if (turned() && onBack(e).r > 145) {
+  tapped = false;
+  down = { x: e.clientX, y: e.clientY, t: Date.now() };
+  if (turned() && onBack(e).r > BEZEL_FROM) {
     // On the bezel: it follows the pointer, but only anticlockwise.
     dragging = true;
     moved = false;
@@ -254,7 +263,6 @@ $('case').addEventListener('pointerdown', e => {
     cancelAnimationFrame(turning);
     return;
   }
-  swipeX = e.clientX;
 });
 $('case').addEventListener('pointermove', e => {
   if (!turned()) return;
@@ -268,16 +276,22 @@ $('case').addEventListener('pointermove', e => {
 $('case').addEventListener('pointerup', e => {
   if (dragging) {
     dragging = false;
-    swiped = true; // not a tap to turn over
     // A tap turns on a quarter; a drag snaps to the nearest quarter behind it.
     settleBezel(moved ? Math.round(bezelDeg / 90) * 90 : Math.round(bezelDeg / 90) * 90 - 90);
     return;
   }
-  if (swipeX != null && Math.abs(e.clientX - swipeX) > 40) { swiped = true; turnOver(); }
-  swipeX = null;
+  if (!down) return;
+  const dx = e.clientX - down.x, dy = e.clientY - down.y, dt = Date.now() - down.t;
+  down = null;
+  if (Math.abs(dx) > 40 && Math.abs(dx) > 2 * Math.abs(dy) && dt < 700) turnOver();
+  else tapped = Math.hypot(dx, dy) < 10 && dt < 500;
 });
-$('case').addEventListener('click', () => {
-  if (!swiped) turnOver();
+$('case').addEventListener('pointercancel', () => { down = null; dragging = false; });
+// A click with no pointer behind it (detail 0) comes from a keyboard or a
+// screen reader, and always turns.
+$('case').addEventListener('click', e => {
+  if (tapped || e.detail === 0) turnOver();
+  tapped = false;
 });
 // Keys: Enter or Space turns the watch over; on the back, the arrows turn
 // the bezel on to the next span, or round to the previous one (it only

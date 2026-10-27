@@ -42,7 +42,8 @@ main {
   min-height: 100vh;
   min-height: 100dvh; /* the visible height, below Safari's address bar */
   margin: 0 auto;
-  padding: max(16px, env(safe-area-inset-top)) 18px max(14px, env(safe-area-inset-bottom));
+  /* The top keeps clear of the soft blur iOS lays under the status bar. */
+  padding: calc(env(safe-area-inset-top, 0px) + 26px) 18px max(14px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -582,7 +583,7 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5
 /* Short screens (an iPhone SE): tighter spacing, so the watch can stay
    bigger and the page still fits. */
 @media (max-height: 720px) {
-  main { padding-top: max(10px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  main { padding-top: calc(env(safe-area-inset-top, 0px) + 18px); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   #app { gap: 6px; }
   .masthead { padding-bottom: 6px; }
   .turn-hint { margin-top: 6px; }

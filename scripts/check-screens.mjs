@@ -73,7 +73,10 @@ for (const [width, height, name] of SIZES) {
     (problems.length ? `\n    ${problems.join('\n    ')}` : ''));
 }
 ws.close();
+// Let Chrome close before removing its profile, or the two can collide.
+const exited = new Promise(r => chrome.once('exit', r));
 chrome.kill();
-rmSync('screens/.profile', { recursive: true, force: true });
+await exited;
+try { rmSync('screens/.profile', { recursive: true, force: true, maxRetries: 3 }); } catch {}
 console.log(`Screenshots in screens/.`);
 process.exit(failed ? 1 : 0);

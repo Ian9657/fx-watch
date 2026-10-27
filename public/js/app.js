@@ -7,7 +7,9 @@ import './sheet.js';
 
 async function loadRates() {
   try {
-    state.rates = await getJSON('/api/rates');
+    // "Today" starts at this device's midnight, like every time on the page.
+    const midnight = new Date().setHours(0, 0, 0, 0) / 1000;
+    state.rates = await getJSON(`/api/rates?since=${midnight}`);
     if (!state.offlineAt) state.lastGood = Date.now();
     state.feedError = null;
   } catch (err) {

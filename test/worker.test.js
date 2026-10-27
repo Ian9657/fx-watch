@@ -103,3 +103,16 @@ test('a check that keeps failing is reported once, and its recovery', async () =
   assert.match(sent[1], /working again after 4 failed checks/);
   assert.equal(store.json('data').failing, undefined);
 });
+
+test("today's change starts from the page's own midnight", async () => {
+  // Quotes at 23:00 and 01:00 UK time on 26/27 Oct (GMT), both on the
+  // Beijing day of the 27th.
+  const late = Date.UTC(2026, 9, 26, 23) / 1000, early = Date.UTC(2026, 9, 27, 1) / 1000;
+  const store = fakeKV({ limits, 'h:2026-10-27': [[late, 8.9, 6.6], [early, 8.95, 6.65]] });
+  network(() => citicFeed(8.96, 6.66));
+  const rates = since => worker.fetch(new Request(`https://x/api/rates?since=${since}`, { headers: { Authorization: 'Bearer pw' } }), env(store)).then(r => r.json());
+  // UK midnight: yesterday's close is the 23:00 quote.
+  assert.equal((await rates(Date.UTC(2026, 9, 27) / 1000)).GBP.previousClose, 8.9);
+  // A midnight two hours later (further west): the 01:00 quote.
+  assert.equal((await rates(Date.UTC(2026, 9, 27, 2) / 1000)).GBP.previousClose, 8.95);
+});

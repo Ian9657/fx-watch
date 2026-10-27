@@ -67,11 +67,13 @@ async function recentRows(env, want) {
   return rows;
 }
 
-// The last price recorded on an earlier Beijing day than today.
-async function previousClose(env) {
-  for (const day of daysBack(beijingDay(Date.now()), 8).slice(1)) {
-    const rows = await readDay(env, day);
-    if (rows.length) return rows.at(-1);
+// The last price recorded before `before` (epoch seconds): yesterday's
+// close, for the page's change today. The page sends its own midnight;
+// without one, Beijing midnight.
+async function previousClose(env, before) {
+  for (const day of daysBack(beijingDay(before * 1000), 8)) {
+    const row = (await readDay(env, day)).filter(r => r[0] < before).at(-1);
+    if (row) return row;
   }
   return null;
 }
@@ -140,7 +142,9 @@ async function api(request, env, path) {
   if (!(await authorized(request, env))) return json({ error: 'Locked' }, 401);
 
   if (path === '/api/rates') {
-    const [quotes, prev] = await Promise.all([fetchCitic(), previousClose(env)]);
+    const since = Number(new URL(request.url).searchParams.get('since'));
+    const before = since > 0 ? since : Date.parse(`${beijingDay(Date.now())}T00:00:00+08:00`) / 1000;
+    const [quotes, prev] = await Promise.all([fetchCitic(), previousClose(env, before)]);
     return json(Object.fromEntries(PAIRS.map((p, i) => [p, { ...quotes[p], previousClose: prev?.[i + 1] ?? null }])));
   }
 

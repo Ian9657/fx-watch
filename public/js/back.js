@@ -12,8 +12,8 @@ let history = [];  // [t, GBP, USD] rows the Worker has recorded, oldest first
 let historyAt = 0; // when history was last loaded (epoch ms)
 const SPANS = [1, 7, 30, 90]; // days, shown one at a time in the bezel's window
 let days = SPANS.includes(Number(store.get('chartDays'))) ? Number(store.get('chartDays')) : 7;
-const HOUR = 3600, DAY = 86400, BJ = 8 * HOUR, GAP = 2 * HOUR;
-const bj = t => new Date((t + BJ) * 1000); // read with getUTC* for Beijing time
+const HOUR = 3600, DAY = 86400, GAP = 2 * HOUR;
+const local = t => new Date(t * 1000); // days and hours are this device's, like every time on the page
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const spanWords = d => d === 1 ? '24 hours' : `${d} days`;
@@ -28,13 +28,15 @@ export async function loadHistory() {
   }
 }
 
-// Ruling for each span: a candidate spoke every `step` seconds from Beijing
-// midnight, kept if `minor` or `major` says so; majors are darker and labelled.
+// Ruling for each span: a candidate spoke every `hours` from local
+// midnight, kept if `minor` or `major` says so; majors are darker and
+// labelled. Stepping by the clock, not by seconds, keeps spokes on the hour
+// across a change to or from summer time.
 const RULING = {
-  1: { step: HOUR, minor: () => true, major: d => d.getUTCHours() % 6 === 0, label: d => String(d.getUTCHours()).padStart(2, '0') },
-  7: { step: 6 * HOUR, minor: () => true, major: d => d.getUTCHours() === 0, label: d => WEEKDAYS[d.getUTCDay()], centred: true },
-  30: { step: DAY, minor: () => true, major: d => d.getUTCDay() === 1, label: d => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}` },
-  90: { step: DAY, minor: d => d.getUTCDay() === 1, major: d => d.getUTCDate() === 1, label: d => MONTHS[d.getUTCMonth()] },
+  1: { hours: 1, minor: () => true, major: d => d.getHours() % 6 === 0, label: d => String(d.getHours()).padStart(2, '0') },
+  7: { hours: 6, minor: () => true, major: d => d.getHours() === 0, label: d => WEEKDAYS[d.getDay()], centred: true },
+  30: { hours: 24, minor: () => true, major: d => d.getDay() === 1, label: d => `${d.getDate()} ${MONTHS[d.getMonth()]}` },
+  90: { hours: 24, minor: d => d.getDay() === 1, major: d => d.getDate() === 1, label: d => MONTHS[d.getMonth()] },
 };
 
 const C = 170, R_IN = 44, R_OUT = 114, R_LABEL = 124, R_TRACK = 135; // centre and radii, back-face units
@@ -63,9 +65,12 @@ export function drawChart() {
   const rule = RULING[days];
   const majors = [];
   out.push(`<circle class="track" cx="${C}" cy="${C}" r="${R_TRACK}"/>`);
-  for (let t = Math.floor((t0 + BJ) / DAY) * DAY - BJ; t <= t1; t += rule.step) {
+  const d = local(t0);
+  d.setHours(0, 0, 0, 0);
+  for (; d.getTime() / 1000 <= t1; d.setHours(d.getHours() + rule.hours)) {
+    const t = d.getTime() / 1000;
     if (t < t0) continue;
-    const d = bj(t), major = rule.major(d), deg = A(t);
+    const major = rule.major(d), deg = A(t);
     const [x0, y0] = polar(R_TRACK, deg), [x1, y1] = polar(R_TRACK + (major ? 7 : 3.5), deg);
     out.push(`<line class="tick${major ? ' major' : ''}" x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}"/>`);
     if (major) {
@@ -78,7 +83,7 @@ export function drawChart() {
     const deg = rule.centred ? A(Math.min(t + DAY / 2, t1)) : A(t);
     if (deg < 22 || deg > 340) continue; // leave the top to START and NOW
     const [x, y] = polar(R_LABEL, deg);
-    out.push(`<text class="tick-label" x="${x}" y="${y}">${rule.label(bj(t))}</text>`);
+    out.push(`<text class="tick-label" x="${x}" y="${y}">${rule.label(local(t))}</text>`);
   }
   for (const k of [1 / 3, 2 / 3]) out.push(`<circle class="ring" cx="${C}" cy="${C}" r="${R_IN + (R_OUT - R_IN) * k}"/>`);
   // The seam at the top: the trace starts just right of it and ends at the
@@ -129,7 +134,7 @@ export function drawChart() {
     change = `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(2)}%`;
     // Recording began after the span's start: say when, as the change is
     // only over that part.
-    if (rows[0][0] - t0 > GAP) since = `SINCE ${bj(rows[0][0]).getUTCDate()} ${MONTHS[bj(rows[0][0]).getUTCMonth()]}`;
+    if (rows[0][0] - t0 > GAP) since = `SINCE ${local(rows[0][0]).getDate()} ${MONTHS[local(rows[0][0]).getMonth()]}`;
     // The pen: a brass pointer, like the markers on the front, on the
     // latest point.
     const pr = Rv(prices.at(-1)), pd = A(rows.at(-1)[0]);

@@ -37,7 +37,8 @@ async function fromNetwork(request, isApi) {
     }
     return response;
   } catch (err) {
-    const saved = await cache.match(request, { ignoreSearch: !isApi });
+    // Ignore the query: /api/rates?since= changes every day.
+    const saved = await cache.match(request, { ignoreSearch: true });
     if (saved) return saved;
     throw err;
   }

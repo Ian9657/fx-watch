@@ -86,12 +86,22 @@ export function buildFace() {
 }
 
 // Printed prices around the scale, every other major tick.
+// On a change of currency the numbers flip in left to right, like the
+// digit window; otherwise they change in place.
+let scaleFor = '';
 function drawScale(price, { floor, ceiling }) {
   const [lo, hi] = span(price, floor, ceiling);
+  const flip = scaleFor && scaleFor !== state.pair;
+  scaleFor = state.pair;
   $('scale').replaceChildren(...Array.from({ length: 7 }, (_, k) => {
     const pos = k / 6;
     const [x, y] = point(pos, 98);
-    return svgEl('text', { x: x.toFixed(1), y: (y + 3).toFixed(1) }, (lo + ((pos - 0.3) / 0.4) * (hi - lo)).toFixed(3));
+    const text = svgEl('text', { x: x.toFixed(1), y: (y + 3).toFixed(1) }, (lo + ((pos - 0.3) / 0.4) * (hi - lo)).toFixed(3));
+    if (flip) {
+      text.classList.add('flip-in');
+      text.style.animationDelay = `${k * 45}ms`;
+    }
+    return text;
   }));
 }
 

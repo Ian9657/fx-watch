@@ -310,6 +310,8 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .band-text.on-band { fill: #f3eee4; }
 .ticks line { stroke: #231c12; }
 .scale text { font: 700 9.5px 'Cormorant Garamond', serif; fill: #2a2216; text-anchor: middle; }
+.scale .flip-in { transform-box: fill-box; transform-origin: center; animation: flip-in .24s ease-out both; }
+@keyframes flip-in { from { transform: scaleY(0); opacity: .3; } to { transform: none; opacity: 1; } }
 .markers polygon { fill: #8a6430; stroke: #4a3214; stroke-width: .6; }
 .window { fill: #151617; stroke: rgba(0,0,0,.6); stroke-width: 3; }
 .window-rim { fill: none; stroke: rgba(80,62,34,.55); stroke-width: .7; }
@@ -584,7 +586,7 @@ footer.small { margin-top: 10px; text-align: center; font-size: 8px; color: #5f5
 
 @media (prefers-reduced-motion: reduce) {
   .needle, .knob-cap, .crown svg { transition: none; }
-  .crown.pressed .crown-knurl, .status.winding .lamp { animation: none; }
+  .crown.pressed .crown-knurl, .status.winding .lamp, .scale .flip-in { animation: none; }
   .tremble { animation: none; }
   .fall, .rise { animation-duration: 0s; }
   .sheet { animation: none; }

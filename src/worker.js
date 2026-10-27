@@ -18,7 +18,7 @@ async function load(env) {
     const sent = old.alerted[p][side];
     return [side, sent === true ? old.limits[p][side] ?? false : sent];
   }))]));
-  return { lastCheck: old.lastCheck ?? null, alerted, limits: limits || old.limits, failing: data?.failing ?? null, alertError: data?.alertError ?? null };
+  return { lastCheck: old.lastCheck ?? null, alerted, limits: limits || old.limits, failing: data?.failing ?? null, alertError: data?.alertError ?? null, sentAt: data?.sentAt ?? {} };
 }
 
 // The same feed that powers the rate table on citicbank.com.
@@ -104,19 +104,22 @@ async function check(env) {
     const quotes = await fetchCitic();
     await record(env, quotes);
     const rates = Object.fromEntries(PAIRS.map(p => [p, quotes[p].price]));
-    const { alerts, alerted } = evaluate(rates, data.limits, data.alerted);
+    const { alerts, alerted, sentAt } = evaluate(rates, data.limits, data.alerted, data.sentAt);
     let alertError = alerts.length ? null : data.alertError;
     for (const alert of alerts) {
       try {
         await sendTelegram(env, alertMessage(alert));
       } catch (err) {
-        alerted[alert.pair][alert.side] = false; // retry on the next check
+        // Retry on the next check: a first alert as if never sent, a repeat
+        // as if not yet due.
+        if (alert.repeat) sentAt[alert.pair][alert.side] = data.sentAt[alert.pair]?.[alert.side] ?? null;
+        else alerted[alert.pair][alert.side] = false;
         alertError = { time: Date.now(), error: err.message };
         console.error(err.message);
       }
     }
     if (data.failing?.told) await sendTelegram(env, recoveredMessage(data.failing)).catch(err => console.error(err.message));
-    await env.STORE.put('data', JSON.stringify({ alerted, lastCheck: { time: Date.now(), rates }, alertError }));
+    await env.STORE.put('data', JSON.stringify({ alerted, sentAt, lastCheck: { time: Date.now(), rates }, alertError }));
   } catch (err) {
     const failing = {
       since: data.failing?.since ?? Date.now(),
@@ -127,7 +130,7 @@ async function check(env) {
     if (failing.count >= FAIL_ALERT_AFTER && !failing.told) {
       failing.told = await sendTelegram(env, failingMessage(failing)).then(() => true, () => false);
     }
-    await env.STORE.put('data', JSON.stringify({ alerted: data.alerted, lastCheck: data.lastCheck, alertError: data.alertError, failing }));
+    await env.STORE.put('data', JSON.stringify({ alerted: data.alerted, sentAt: data.sentAt, lastCheck: data.lastCheck, alertError: data.alertError, failing }));
     throw err; // logged by Cloudflare as a failed run
   }
 }

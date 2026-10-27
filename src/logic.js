@@ -101,41 +101,56 @@ export const REARM = 0.001;
 const rearmed = (side, rate, limit) =>
   side === 'floor' ? rate > limit * (1 + REARM) : rate < limit * (1 - REARM);
 
-// Decide which alerts to send. Each side alerts once when the rate crosses
-// its limit (below a floor, above a ceiling), then stays quiet until the
-// rate is back inside the limit by more than REARM.
+// Decide which alerts to send. Each side alerts when the rate crosses its
+// limit (below a floor, above a ceiling), then again every REPEAT_MS while
+// it stays out there, and goes quiet once the rate is back inside the limit
+// by more than REARM. Coming back inside sends nothing.
 //
 // A side that has alerted records the limit it alerted for, so a new limit
 // can alert straight away without anyone resetting it: saving settings
 // never has to touch the alert state, and the check never has to touch the
 // limits. (`true` is the old record, from before limits were kept.)
-export function evaluate(rates, limits, alerted) {
-  const next = {};
+// `sentAt` holds when each side last alerted, for the repeats.
+export const REPEAT_MS = 4 * 3600_000;
+
+export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now()) {
+  const next = {}, nextAt = {};
   const alerts = [];
   for (const pair of PAIRS) {
     next[pair] = { ...alerted[pair] };
+    nextAt[pair] = { floor: null, ceiling: null, ...sentAt[pair] };
     const rate = rates[pair];
     for (const side of SIDES) {
       const limit = limits[pair]?.[side];
       const sent = alerted[pair]?.[side];
-      if (!Number.isFinite(rate) || limit == null) {
+      const at = sentAt[pair]?.[side] ?? null;
+      if (!Number.isFinite(rate) || limit == null || (!crossed(side, rate, limit) && rearmed(side, rate, limit))) {
         next[pair][side] = false;
+        nextAt[pair][side] = null;
       } else if (crossed(side, rate, limit)) {
-        if (sent !== limit && sent !== true) alerts.push({ pair, side, rate, limit });
+        if (sent !== limit && sent !== true) {
+          alerts.push({ pair, side, rate, limit, repeat: false });
+          nextAt[pair][side] = now;
+        } else if (at == null) {
+          nextAt[pair][side] = now; // an old record with no time: start the clock
+        } else if (now - at >= REPEAT_MS) {
+          alerts.push({ pair, side, rate, limit, repeat: true });
+          nextAt[pair][side] = now;
+        }
         next[pair][side] = limit;
-      } else if (rearmed(side, rate, limit)) {
-        next[pair][side] = false;
       }
     }
   }
-  return { alerts, alerted: next };
+  return { alerts, alerted: next, sentAt: nextAt };
 }
 
-export function alertMessage({ pair, side, rate, limit }) {
+export function alertMessage({ pair, side, rate, limit, repeat }) {
   const name = side === 'floor' ? 'Floor' : 'Ceiling';
-  return `${pair} is ${side === 'floor' ? 'below' : 'above'} your ${side}\n` +
+  const where = side === 'floor' ? 'below' : 'above';
+  return `${pair} is ${repeat ? 'still ' : ''}${where} your ${side}\n` +
     `CITIC buy price: 1 ${pair} = ${rate.toFixed(4)} CNY\n` +
     `${name}: ${limit.toFixed(4)}\n` +
+    (repeat ? `A reminder every ${REPEAT_MS / 3600_000} hours while it stays ${where}.\n` : '') +
     `https://fx.etarc.net`;
 }
 

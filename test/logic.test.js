@@ -48,6 +48,24 @@ test('a price wobbling around the floor alerts only once', () => {
   assert.equal(sent, 1);
 });
 
+test('repeats every 4 hours while the rate stays out, and says nothing coming back', () => {
+  const l = limits({ floor: 8.9 }), h = 3600_000;
+  let r = evaluate({ GBP: 8.8 }, l, none, {}, 0);
+  assert.equal(r.alerts.length, 1);
+  r = evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 3.9 * h);
+  assert.equal(r.alerts.length, 0, 'not yet');
+  r = evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 4 * h);
+  assert.deepEqual(r.alerts.map(a => a.repeat), [true]);
+  assert.match(alertMessage(r.alerts[0]), /still below your floor[\s\S]*every 4 hours/);
+  // Four hours after that repeat, again.
+  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 7.9 * h).alerts.length, 0);
+  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 8 * h).alerts.length, 1);
+  // Back inside: no message, and the clock is cleared.
+  const back = evaluate({ GBP: 9.0 }, l, r.alerted, r.sentAt, 9 * h);
+  assert.equal(back.alerts.length, 0);
+  assert.equal(back.sentAt.GBP.floor, null);
+});
+
 test('a new limit alerts straight away, with no reset of the alert state', () => {
   const first = evaluate({ GBP: 8.8 }, limits({ floor: 8.9 }), none);
   assert.equal(first.alerted.GBP.floor, 8.9);

@@ -65,6 +65,11 @@ button { cursor: pointer; }
 
 /* Letterpress: light type on the dark ground gets a dark edge above it. */
 .press { text-shadow: 0 -1px 0 rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.06); }
+/* On a phone (2-3x pixels) a 1px shadow is 2-3 device pixels wide and reads
+   as a blurred double edge, so it shrinks to a hairline there. */
+@media (min-resolution: 2dppx) {
+  .press { text-shadow: 0 -0.5px 0 rgba(0,0,0,.7); }
+}
 
 .masthead {
   display: flex;

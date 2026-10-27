@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, TAPE_LENGTH, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage } from '../src/logic.js';
+import { parseCitic, TAPE_LENGTH, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage, failingMessage, recoveredMessage } from '../src/logic.js';
 
 const none = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
 const limits = (gbp, usd = {}) => ({
@@ -134,4 +134,12 @@ test('old single history splits into Beijing days', () => {
   const a = Date.UTC(2026, 9, 26, 15, 59) / 1000, b = Date.UTC(2026, 9, 26, 16, 1) / 1000;
   assert.deepEqual(Object.keys(splitByDay([[a, 1, 1], [b, 2, 2]])), ['2026-10-26', '2026-10-27']);
   assert.deepEqual(daysBack('2026-03-01', 3), ['2026-03-01', '2026-02-28', '2026-02-27']);
+});
+
+test('failure and recovery messages say how long alerts were off', () => {
+  const msg = failingMessage({ count: 3, error: 'CITIC returned 503' });
+  assert.match(msg, /failed 3 times in a row \(about 30 minutes\)/);
+  assert.match(msg, /alerts are paused/);
+  assert.match(msg, /CITIC returned 503/);
+  assert.match(recoveredMessage({ count: 5 }), /after 5 failed checks \(about 50 minutes\)/);
 });

@@ -154,3 +154,19 @@ export function testMessage(quotes, limits) {
     `Alerts: ${list(p => describeLimits(limits[p]))}\n` +
     `You'll get a message when a price crosses one of these.`;
 }
+
+// When the 10-minute check keeps failing, alerts can't fire, so say so once
+// it has failed FAIL_ALERT_AFTER times in a row (about half an hour), and
+// again when it recovers.
+export const FAIL_ALERT_AFTER = 3;
+
+export function failingMessage({ count, error }) {
+  return `FX Watch: the price check has failed ${count} times in a row (about ${count * 10} minutes).\n` +
+    `Floor and ceiling alerts are paused until it works again.\n` +
+    `Last error: ${error}\n` +
+    `https://fx.etarc.net`;
+}
+
+export function recoveredMessage({ count }) {
+  return `FX Watch: the price check is working again after ${count} failed checks (about ${count * 10} minutes). Alerts are back on.`;
+}

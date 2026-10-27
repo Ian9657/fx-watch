@@ -1,4 +1,4 @@
-import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, DAY_TTL, dayKey, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage } from './logic.js';
+import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, DAY_TTL, dayKey, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage } from './logic.js';
 
 // Two records, each with one writer, so neither can overwrite the other:
 // 'limits' is written only when you save settings, and 'data' (alert state
@@ -18,7 +18,7 @@ async function load(env) {
     const sent = old.alerted[p][side];
     return [side, sent === true ? old.limits[p][side] ?? false : sent];
   }))]));
-  return { lastCheck: old.lastCheck ?? null, alerted, limits: limits || old.limits };
+  return { lastCheck: old.lastCheck ?? null, alerted, limits: limits || old.limits, failing: data?.failing ?? null, alertError: data?.alertError ?? null };
 }
 
 // The same feed that powers the rate table on citicbank.com.
@@ -95,22 +95,41 @@ async function authorized(request, env) {
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
+// The 10-minute check: record the quote, send any alerts, and keep a note of
+// failures so that a check that keeps failing is reported (see logic.js).
 async function check(env) {
   const data = await load(env);
-  await splitOldHistory(env);
-  const quotes = await fetchCitic();
-  await record(env, quotes);
-  const rates = Object.fromEntries(PAIRS.map(p => [p, quotes[p].price]));
-  const { alerts, alerted } = evaluate(rates, data.limits, data.alerted);
-  for (const alert of alerts) {
-    try {
-      await sendTelegram(env, alertMessage(alert));
-    } catch (err) {
-      alerted[alert.pair][alert.side] = false; // retry on the next check
-      console.error(err.message);
+  try {
+    await splitOldHistory(env);
+    const quotes = await fetchCitic();
+    await record(env, quotes);
+    const rates = Object.fromEntries(PAIRS.map(p => [p, quotes[p].price]));
+    const { alerts, alerted } = evaluate(rates, data.limits, data.alerted);
+    let alertError = alerts.length ? null : data.alertError;
+    for (const alert of alerts) {
+      try {
+        await sendTelegram(env, alertMessage(alert));
+      } catch (err) {
+        alerted[alert.pair][alert.side] = false; // retry on the next check
+        alertError = { time: Date.now(), error: err.message };
+        console.error(err.message);
+      }
     }
+    if (data.failing?.told) await sendTelegram(env, recoveredMessage(data.failing)).catch(err => console.error(err.message));
+    await env.STORE.put('data', JSON.stringify({ alerted, lastCheck: { time: Date.now(), rates }, alertError }));
+  } catch (err) {
+    const failing = {
+      since: data.failing?.since ?? Date.now(),
+      count: (data.failing?.count ?? 0) + 1,
+      error: err.message,
+      told: data.failing?.told ?? false,
+    };
+    if (failing.count >= FAIL_ALERT_AFTER && !failing.told) {
+      failing.told = await sendTelegram(env, failingMessage(failing)).then(() => true, () => false);
+    }
+    await env.STORE.put('data', JSON.stringify({ alerted: data.alerted, lastCheck: data.lastCheck, alertError: data.alertError, failing }));
+    throw err; // logged by Cloudflare as a failed run
   }
-  await env.STORE.put('data', JSON.stringify({ alerted, lastCheck: { time: Date.now(), rates } }));
 }
 
 async function api(request, env, path) {

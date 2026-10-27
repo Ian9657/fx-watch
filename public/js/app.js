@@ -114,7 +114,13 @@ addEventListener('resize', fit);
 document.fonts?.ready.then(fit);
 
 // Keep an offline copy, so the app opens without a connection (sw.js).
-navigator.serviceWorker?.register('/sw.js').catch(() => {});
+// When a new version of it takes over an open page, reload once, so the
+// page doesn't carry on with files the old one served.
+if (navigator.serviceWorker) {
+  const hadOne = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadOne) location.reload(); });
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 
 buildFace();
 if (store.get('password')) refreshAll().then(fit);

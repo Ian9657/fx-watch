@@ -85,18 +85,16 @@ export function drawChart() {
     const [x, y] = polar(R_LABEL, deg);
     out.push(`<text class="tick-label" x="${x}" y="${y}">${rule.label(local(t))}</text>`);
   }
-  // Price runs outward on the same scale as the front: the floor ring always
-  // at 0.3 and the ceiling ring at 0.7, so the chart looks the same for
-  // either currency; a price past the scale runs along its edge. A side with
-  // no limit keeps its ring, faint and marked OFF, like the front's band.
+  // Price runs outward on the front's scale, opened out by half again so
+  // the HOLD band is wider: the floor ring always at 0.2 and the ceiling
+  // ring at 0.8, so the chart looks the same for either currency; a price
+  // past the scale runs along its edge. A side with no limit keeps its
+  // ring, faint.
   const { floor, ceiling } = limitsFor(pair);
-  const R = pos => R_IN + pos * (R_OUT - R_IN);
+  const R = pos => R_IN + Math.min(0.98, Math.max(0.02, 0.5 + (pos - 0.5) * 1.5)) * (R_OUT - R_IN);
   out.push(`<circle class="ring" cx="${C}" cy="${C}" r="${R(0.5)}"/>`);
   for (const [side, v, pos] of [['floor', floor, 0.3], ['ceiling', ceiling, 0.7]]) {
-    // Each ring is named at its foot, so it doesn't rely on colour alone.
-    const name = (side === 'floor' ? 'FLOOR' : 'CEILING') + (v == null ? ' OFF' : '');
     out.push(`<circle class="limit ${side}${v == null ? ' unset' : ''}" cx="${C}" cy="${C}" r="${R(pos)}"/>`);
-    out.push(`<text class="limit-name ${side}${v == null ? ' unset' : ''}" x="${C}" y="${C + R(pos) + 2}">${name}</text>`);
   }
   // The seam at the top: the trace starts just right of it and ends at the
   // pen just left of it.

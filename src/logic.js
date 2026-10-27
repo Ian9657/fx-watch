@@ -63,7 +63,10 @@ export function migrate(data) {
   const limits = data.limits || Object.fromEntries(PAIRS.map(p => [p, { floor: data.floors?.[p] ?? null, ceiling: null }]));
   const alerted = Object.fromEntries(PAIRS.map(p => {
     const a = data.alerted?.[p];
-    return [p, typeof a === 'object' && a ? { floor: !!a.floor, ceiling: !!a.ceiling } : { floor: !!a, ceiling: false }];
+    // A side holds the limit it alerted for (a number), true from older
+    // records, or false.
+    const keep = v => typeof v === 'number' ? v : !!v;
+    return [p, typeof a === 'object' && a ? { floor: keep(a.floor), ceiling: keep(a.ceiling) } : { floor: !!a, ceiling: false }];
   }));
   const { floors, ...rest } = data;
   return { ...rest, limits, alerted };
@@ -82,6 +85,11 @@ const rearmed = (side, rate, limit) =>
 // Decide which alerts to send. Each side alerts once when the rate crosses
 // its limit (below a floor, above a ceiling), then stays quiet until the
 // rate is back inside the limit by more than REARM.
+//
+// A side that has alerted records the limit it alerted for, so a new limit
+// can alert straight away without anyone resetting it: saving settings
+// never has to touch the alert state, and the check never has to touch the
+// limits. (`true` is the old record, from before limits were kept.)
 export function evaluate(rates, limits, alerted) {
   const next = {};
   const alerts = [];
@@ -90,11 +98,12 @@ export function evaluate(rates, limits, alerted) {
     const rate = rates[pair];
     for (const side of SIDES) {
       const limit = limits[pair]?.[side];
+      const sent = alerted[pair]?.[side];
       if (!Number.isFinite(rate) || limit == null) {
         next[pair][side] = false;
       } else if (crossed(side, rate, limit)) {
-        if (!alerted[pair]?.[side]) alerts.push({ pair, side, rate, limit });
-        next[pair][side] = true;
+        if (sent !== limit && sent !== true) alerts.push({ pair, side, rate, limit });
+        next[pair][side] = limit;
       } else if (rearmed(side, rate, limit)) {
         next[pair][side] = false;
       }

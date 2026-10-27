@@ -48,6 +48,19 @@ test('a price wobbling around the floor alerts only once', () => {
   assert.equal(sent, 1);
 });
 
+test('a new limit alerts straight away, with no reset of the alert state', () => {
+  const first = evaluate({ GBP: 8.8 }, limits({ floor: 8.9 }), none);
+  assert.equal(first.alerted.GBP.floor, 8.9);
+  // Still below the same floor: quiet.
+  assert.equal(evaluate({ GBP: 8.7 }, limits({ floor: 8.9 }), first.alerted).alerts.length, 0);
+  // Floor moved and the price is still below it: alerts for the new floor.
+  const moved = evaluate({ GBP: 8.7 }, limits({ floor: 8.85 }), first.alerted);
+  assert.deepEqual(moved.alerts.map(a => a.limit), [8.85]);
+  // An alert state saved before limits were recorded (true) stays quiet.
+  const old = { GBP: { floor: true, ceiling: false }, USD: { floor: false, ceiling: false } };
+  assert.equal(evaluate({ GBP: 8.7 }, limits({ floor: 8.9 }), old).alerts.length, 0);
+});
+
 test('migrates settings saved before ceilings existed', () => {
   const data = migrate({ floors: { GBP: 8.9, USD: null }, alerted: { GBP: true, USD: false }, lastCheck: 1 });
   assert.deepEqual(data.limits, limits({ floor: 8.9 }));
@@ -55,6 +68,8 @@ test('migrates settings saved before ceilings existed', () => {
   assert.equal(data.lastCheck, 1);
   assert.equal('floors' in data, false);
   assert.deepEqual(migrate({}).limits, limits({}));
+  // The limit an alert was for survives a round trip.
+  assert.deepEqual(migrate({ alerted: { GBP: { floor: 8.92, ceiling: false } } }).alerted.GBP, { floor: 8.92, ceiling: false });
 });
 
 test('alert message names the side that was crossed', () => {

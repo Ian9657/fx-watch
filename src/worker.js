@@ -1,11 +1,24 @@
 import { PAIRS, SIDES, parseCitic, appendTape, appendHistory, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage } from './logic.js';
 
+// Two records, each with one writer, so neither can overwrite the other:
+// 'limits' is written only when you save settings, and 'data' (alert state
+// and the last check) only by the 10-minute check. Limits saved before the
+// split are moved to 'limits' the first time they're read.
 async function load(env) {
-  return { lastCheck: null, ...migrate((await env.STORE.get('data', 'json')) || {}) };
-}
-
-async function save(env, data) {
-  await env.STORE.put('data', JSON.stringify(data));
+  let [data, limits] = await Promise.all([env.STORE.get('data', 'json'), env.STORE.get('limits', 'json')]);
+  const old = migrate(data || {});
+  // First read after the split: move the limits into their own record, once.
+  if (!limits && data?.limits) {
+    limits = old.limits;
+    await env.STORE.put('limits', JSON.stringify(limits));
+  }
+  // Alert state from before the split says only true, not which limit it was
+  // for; that was the limit saved alongside it.
+  const alerted = Object.fromEntries(PAIRS.map(p => [p, Object.fromEntries(SIDES.map(side => {
+    const sent = old.alerted[p][side];
+    return [side, sent === true ? old.limits[p][side] ?? false : sent];
+  }))]));
+  return { lastCheck: old.lastCheck ?? null, alerted, limits: limits || old.limits };
 }
 
 // The same feed that powers the rate table on citicbank.com.
@@ -72,7 +85,7 @@ async function check(env) {
       console.error(err.message);
     }
   }
-  await save(env, { ...data, alerted, lastCheck: { time: Date.now(), rates } });
+  await env.STORE.put('data', JSON.stringify({ alerted, lastCheck: { time: Date.now(), rates } }));
 }
 
 async function api(request, env, path) {
@@ -111,13 +124,9 @@ async function api(request, env, path) {
         return json({ error: `${p} floor must be lower than its ceiling` }, 400);
       }
     }
-    const data = await load(env);
-    // A changed limit starts fresh, so it can alert straight away.
-    const alerted = structuredClone(data.alerted);
-    for (const p of PAIRS) for (const side of SIDES) {
-      if (limits[p][side] !== data.limits[p][side]) alerted[p][side] = false;
-    }
-    await save(env, { ...data, limits, alerted });
+    // A changed limit can alert straight away: the alert state records the
+    // limit each alert was for, so it needn't be touched here.
+    await env.STORE.put('limits', JSON.stringify(limits));
     return json({ limits });
   }
 

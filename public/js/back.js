@@ -85,13 +85,13 @@ export function drawChart() {
     const [x, y] = polar(R_LABEL, deg);
     out.push(`<text class="tick-label" x="${x}" y="${y}">${rule.label(local(t))}</text>`);
   }
-  // Price runs outward on the front's scale, opened out by half again so
-  // the HOLD band is wider: the floor ring always at 0.2 and the ceiling
-  // ring at 0.8, so the chart looks the same for either currency; a price
-  // past the scale runs along its edge. A side with no limit keeps its
-  // ring, faint.
+  // Price runs outward on the front's scale, opened out so the HOLD band is
+  // wide: the floor ring (0.3 on the front) always at 0.2 of the way out and
+  // the ceiling ring (0.7) at 0.88, so the chart looks the same for either
+  // currency; a price past the scale runs along its edge. A side with no
+  // limit keeps its ring, faint.
   const { floor, ceiling } = limitsFor(pair);
-  const R = pos => R_IN + Math.min(0.98, Math.max(0.02, 0.5 + (pos - 0.5) * 1.5)) * (R_OUT - R_IN);
+  const R = pos => R_IN + Math.min(0.98, Math.max(0.02, 0.2 + (pos - 0.3) * 1.7)) * (R_OUT - R_IN);
   out.push(`<circle class="ring" cx="${C}" cy="${C}" r="${R(0.5)}"/>`);
   for (const [side, v, pos] of [['floor', floor, 0.3], ['ceiling', ceiling, 0.7]]) {
     out.push(`<circle class="limit ${side}${v == null ? ' unset' : ''}" cx="${C}" cy="${C}" r="${R(pos)}"/>`);

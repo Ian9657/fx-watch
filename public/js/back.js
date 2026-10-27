@@ -1,6 +1,6 @@
 // The back of the watch: a round chart of the recorded price, the bezel
 // that sets its time span, and turning the watch over.
-import { $, PAIRS, store, state, getJSON, Locked, limitsFor } from './shared.js';
+import { $, PAIRS, store, state, getJSON, Locked, limitsFor, position } from './shared.js';
 
 // ---- Chart ---------------------------------------------------------------
 // A circular chart recorder: the paper turns once per span, the pen sits at
@@ -85,7 +85,19 @@ export function drawChart() {
     const [x, y] = polar(R_LABEL, deg);
     out.push(`<text class="tick-label" x="${x}" y="${y}">${rule.label(local(t))}</text>`);
   }
-  for (const k of [1 / 3, 2 / 3]) out.push(`<circle class="ring" cx="${C}" cy="${C}" r="${R_IN + (R_OUT - R_IN) * k}"/>`);
+  // Price runs outward on the same scale as the front: the floor ring always
+  // at 0.3 and the ceiling ring at 0.7, so the chart looks the same for
+  // either currency; a price past the scale runs along its edge. A side with
+  // no limit keeps its ring, faint and marked OFF, like the front's band.
+  const { floor, ceiling } = limitsFor(pair);
+  const R = pos => R_IN + pos * (R_OUT - R_IN);
+  out.push(`<circle class="ring" cx="${C}" cy="${C}" r="${R(0.5)}"/>`);
+  for (const [side, v, pos] of [['floor', floor, 0.3], ['ceiling', ceiling, 0.7]]) {
+    // Each ring is named at its foot, so it doesn't rely on colour alone.
+    const name = (side === 'floor' ? 'FLOOR' : 'CEILING') + (v == null ? ' OFF' : '');
+    out.push(`<circle class="limit ${side}${v == null ? ' unset' : ''}" cx="${C}" cy="${C}" r="${R(pos)}"/>`);
+    out.push(`<text class="limit-name ${side}${v == null ? ' unset' : ''}" x="${C}" y="${C + R(pos) + 2}">${name}</text>`);
+  }
   // The seam at the top: the trace starts just right of it and ends at the
   // pen just left of it.
   out.push(`<line class="seam" x1="${C}" y1="${C - R_IN - 6}" x2="${C}" y2="${C - R_TRACK}"/>`);
@@ -96,31 +108,8 @@ export function drawChart() {
   let change = '—', since = '';
   if (rows.length) {
     const prices = rows.map(r => r[col]);
-    const { floor, ceiling } = limitsFor(pair);
-    // Stretch the scale to take in a limit that's close; one further off is
-    // pinned to the edge, dashed, with its value.
-    let lo = Math.min(...prices), hi = Math.max(...prices);
-    const own = hi - lo || hi * 0.002;
-    if (floor != null && floor < lo && lo - floor <= own) lo = floor;
-    if (ceiling != null && ceiling > hi && ceiling - hi <= own) hi = ceiling;
-    const pad = (hi - lo) * 0.1;
-    lo -= pad; hi += pad;
-    const Rv = v => R_IN + (v - lo) / (hi - lo) * (R_OUT - R_IN);
-    for (const [side, v] of [['floor', floor], ['ceiling', ceiling]]) {
-      if (v == null) continue;
-      // Each ring is named at its foot, so it doesn't rely on colour alone.
-      const name = side === 'floor' ? 'FLOOR' : 'CEILING';
-      if (v > lo && v < hi) {
-        const r = Rv(v);
-        out.push(`<circle class="limit ${side}" cx="${C}" cy="${C}" r="${r}"/>`);
-        out.push(`<text class="limit-name ${side}" x="${C}" y="${C + r + 2}">${name}</text>`);
-      } else {
-        const r = side === 'floor' ? R_IN : R_OUT;
-        out.push(`<circle class="limit off ${side}" cx="${C}" cy="${C}" r="${r}"/>`);
-        const [x, y] = polar(r + (side === 'floor' ? 9 : -7), 180);
-        out.push(`<text class="limit-tag ${side}" x="${x}" y="${y}">${name} ${side === 'floor' ? '↓' : '↑'} ${v.toFixed(4)}</text>`);
-      }
-    }
+    const ref = prices.at(-1); // centres the scale when no limit is set
+    const Rv = v => R(position(v, floor, ceiling, ref));
     // Thinned rows sit `every` quotes apart, so only a longer pause is a gap.
     const gapAfter = Math.max(GAP, every * 600 * 2);
     let d = '';

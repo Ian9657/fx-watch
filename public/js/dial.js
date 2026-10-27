@@ -1,6 +1,6 @@
 // The front of the watch: the dial, the digit window, the status line and
 // the currency knob.
-import { $, PAIRS, store, state, time, limitsFor } from './shared.js';
+import { $, PAIRS, store, state, time, limitsFor, span, position } from './shared.js';
 import { drawTape } from './tape.js';
 import { drawChart, turned } from './back.js';
 
@@ -46,21 +46,6 @@ export function renderStatus() {
   $('refresh').className = `status ${level}`;
   $('status-text').textContent = text;
   $('refresh').title = failing?.error || alertError?.error || feedError || '';
-}
-
-// The dial maps a price range onto a half circle, 0 (far left) to 1 (far
-// right). The floor sits at 0.3 and the ceiling at 0.7, so the HOLD band is
-// the range you set. With one side off, a 1% span stands in for the missing
-// limit only to scale the dial; that side's band reads OFF and never alerts.
-function span(price, floor, ceiling) {
-  if (floor == null && ceiling == null) return [price * 0.995, price * 1.005];
-  return [floor ?? ceiling * 0.99, ceiling ?? floor * 1.01];
-}
-
-function position(price, floor, ceiling) {
-  const [lo, hi] = span(price, floor, ceiling);
-  const pos = 0.3 + (0.4 * (price - lo)) / (hi - lo);
-  return Math.min(0.98, Math.max(0.02, pos));
 }
 
 const SVG = 'http://www.w3.org/2000/svg';

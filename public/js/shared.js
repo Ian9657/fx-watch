@@ -80,3 +80,19 @@ export function limitsFor(p) {
   if (!state.draft || p !== state.pair || crossed(draftLimits())) return state.limits[p];
   return draftLimits();
 }
+
+// Both faces map a price the same way, so they read alike whatever the
+// currency: 0 to 1 across the scale, the floor always at 0.3 and the
+// ceiling at 0.7, so the HOLD band is the range you set. With one side
+// off, a 1% span stands in for the missing limit only to scale it; with
+// both off, half a percent either side of the price.
+export function span(price, floor, ceiling) {
+  if (floor == null && ceiling == null) return [price * 0.995, price * 1.005];
+  return [floor ?? ceiling * 0.99, ceiling ?? floor * 1.01];
+}
+
+export function position(price, floor, ceiling, ref = price) {
+  const [lo, hi] = span(ref, floor, ceiling);
+  const pos = 0.3 + (0.4 * (price - lo)) / (hi - lo);
+  return Math.min(0.98, Math.max(0.02, pos));
+}

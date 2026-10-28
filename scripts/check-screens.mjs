@@ -1,6 +1,7 @@
 // Open the app (npm run dev must be running) at phone and desktop sizes in
 // headless Chrome and check that it fits one screen without scrolling,
-// throws no errors, and turns over. Screenshots go to screens/ for a look.
+// throws no errors, turns over, and that the knob turns, a wheel drags and
+// the settings sheet fits. Screenshots go to screens/ for a look.
 //
 //   npm run check:screens
 import { spawn } from 'node:child_process';
@@ -60,12 +61,41 @@ for (const [width, height, name] of SIZES) {
   await value(`document.getElementById('case').click()`); await sleep(1500);
   const back = await value(`document.getElementById('case').classList.contains('over') && !!document.querySelector('#polar .hub-span')`);
   writeFileSync(`screens/${name}-back.png`, Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+  await value(`document.getElementById('case').click()`); await sleep(1000);
+
+  // The controls, worked as a hand would: drag a wheel up a notch, turn
+  // the knob over and back, then open the sheet and screenshot it.
+  const centre = sel => value(`(() => { const r = document.querySelector('${sel}').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+  const drag = async (sel, dx, dy) => {
+    const { x, y } = await centre(sel);
+    const mouse = (type, k) => send('Input.dispatchMouseEvent', { type, x: x + dx * k, y: y + dy * k, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
+    await mouse('mousePressed', 0);
+    for (let k = 1; k <= 8; k++) { await mouse('mouseMoved', k / 8); await sleep(16); }
+    await mouse('mouseReleased', 1);
+  };
+  const pair = () => value(`localStorage.getItem('pair') || 'GBP'`);
+  const before = await pair();
+  await drag('#knob', 40, 0); await sleep(700);
+  const turnedTo = await pair();
+  await drag('#knob', -40, 0); await sleep(700);
+  const knobOk = turnedTo !== before && (await pair()) === before;
+  await value(`document.getElementById('toggle-settings').click()`); await sleep(1200);
+  const digit = () => value(`document.querySelectorAll('#wheels-floor .wheel')[4].getAttribute('aria-valuenow')`);
+  const was = await digit();
+  await drag('#wheels-floor .wheel:last-child', 0, -26); await sleep(600);
+  const wheelOk = (await digit()) === String((Number(was) + 1) % 10);
+  const sheet = await value(`(() => { const r = document.getElementById('settings').getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; })()`);
+  writeFileSync(`screens/${name}-sheet.png`, Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+  await value(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`); await sleep(500);
 
   const problems = [
     m.locked && 'stuck on the lock screen (wrong PASSWORD?)',
     width < 600 && (m.scrolled > 0 || m.tall) && 'page scrolls',
     m.bottom > height && `footer below the screen (${m.bottom} > ${height})`,
     !back && "back didn't turn over",
+    !knobOk && "knob didn't turn to the other currency and back",
+    !wheelOk && "wheel didn't turn up a notch when dragged",
+    (sheet.top < 0 || sheet.bottom > height + 1) && `settings sheet off the screen (${sheet.top}–${sheet.bottom})`,
     ...errors.map(e => `error: ${e}`),
   ].filter(Boolean);
   failed += problems.length > 0;

@@ -6,8 +6,9 @@ import { $, PAIRS, store, state, getJSON, Locked, limitsFor, position, sound, ha
 // A circular chart recorder: the paper turns once per span, the pen sits at
 // the top on the latest quote, and the trace runs clockwise from just past
 // the top round to it. Further out is a higher price. The floor and ceiling
-// are rings in the dial's band colours. A gap of over two hours with no
-// quote breaks the trace.
+// are rings in the dial's band colours. A quote stands until the next one,
+// so through a quiet spell (a weekend) the trace holds its price round the
+// paper, then steps to the new quote.
 let history = [];  // [t, GBP, USD] rows the Worker has recorded, oldest first
 let historyAt = 0; // when history was last loaded (epoch ms)
 const SPANS = [1, 7, 30, 90]; // days, shown one at a time in the bezel's window
@@ -54,10 +55,17 @@ export function drawChart() {
   const t1 = Date.now() / 1000, t0 = t1 - days * DAY;
   // Time runs clockwise from 10° past the top round to the pen at the top.
   const A = t => 10 + 350 * (t - t0) / (t1 - t0);
-  let rows = history.filter(r => r[0] >= t0 && r[col] != null);
+  const priced = history.filter(r => r[col] != null);
+  let rows = priced.filter(r => r[0] >= t0);
   // At most about one point per 0.4°; 90 days holds ~13,000 quotes.
   const every = Math.ceil(rows.length / 900);
   if (every > 1) rows = rows.filter((r, i) => i % every === 0 || i === rows.length - 1);
+  // The quote standing when the span began starts the trace at START, and
+  // the latest still stood at the last check, so the trace runs on to it.
+  const before = priced.findLast(r => r[0] < t0);
+  if (before) rows.unshift([t0, ...before.slice(1)]);
+  const checked = Math.min(t1, (state.lastCheck ?? 0) / 1000);
+  if (rows.length && checked > rows.at(-1)[0]) rows.push([checked, ...rows.at(-1).slice(1)]);
   const out = [];
 
   // A track of ticks round the paper's edge, like the front's: one per step
@@ -108,20 +116,26 @@ export function drawChart() {
     const prices = rows.map(r => r[col]);
     const ref = prices.at(-1); // centres the scale when no limit is set
     const Rv = v => R(position(v, floor, ceiling, ref));
-    // Thinned rows sit `every` quotes apart, so only a longer pause is a gap.
-    const gapAfter = Math.max(GAP, every * 600 * 2);
+    // Quotes close together are joined straight; after a longer pause the
+    // pen holds the old price along its circle, then steps to the new one.
     let d = '';
     rows.forEach((r, i) => {
-      const gap = i === 0 || r[0] - rows[i - 1][0] > gapAfter;
       const [x, y] = polar(Rv(r[col]), A(r[0]));
-      d += `${gap ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+      if (i === 0) { d += `M${x.toFixed(1)},${y.toFixed(1)}`; return; }
+      const prev = rows[i - 1];
+      if (r[0] - prev[0] > GAP) {
+        const rr = Rv(prev[col]), [hx, hy] = polar(rr, A(r[0]));
+        const large = A(r[0]) - A(prev[0]) > 180 ? 1 : 0;
+        d += `A${rr.toFixed(1)},${rr.toFixed(1)} 0 ${large} 1 ${hx.toFixed(1)},${hy.toFixed(1)}`;
+      }
+      d += `L${x.toFixed(1)},${y.toFixed(1)}`;
     });
     out.push(`<path class="ink" d="${d}"/>`);
     const pct = (prices.at(-1) - prices[0]) / prices[0] * 100;
     change = `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(2)}%`;
     // Recording began after the span's start: say when, as the change is
     // only over that part.
-    if (rows[0][0] - t0 > GAP) since = `SINCE ${local(rows[0][0]).getDate()} ${MONTHS[local(rows[0][0]).getMonth()]}`;
+    if (!before && rows[0][0] - t0 > GAP) since = `SINCE ${local(rows[0][0]).getDate()} ${MONTHS[local(rows[0][0]).getMonth()]}`;
     // The pen: a brass pointer, like the markers on the front, on the
     // latest point.
     const pr = Rv(prices.at(-1)), pd = A(rows.at(-1)[0]);

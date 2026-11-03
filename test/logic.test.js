@@ -93,6 +93,9 @@ test('migrates settings saved before ceilings existed', () => {
 test('alert message names the side that was crossed', () => {
   assert.match(alertMessage({ pair: 'GBP', side: 'ceiling', rate: 9.05, limit: 9 }), /GBP is above your ceiling[\s\S]*Ceiling: 9\.0000/);
   assert.match(alertMessage({ pair: 'USD', side: 'floor', rate: 6.6, limit: 6.65 }), /USD is below your floor[\s\S]*Floor: 6\.6500/);
+  // Where it re-arms, 0.1% back inside the limit.
+  assert.match(alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }), /Re-arms once back above 8\.9089\./);
+  assert.match(alertMessage({ pair: 'GBP', side: 'ceiling', rate: 9.05, limit: 9 }), /Re-arms once back below 8\.9910\./);
 });
 
 test('parses the CITIC rate feed', () => {

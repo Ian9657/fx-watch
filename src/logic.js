@@ -98,8 +98,10 @@ const crossed = (side, rate, limit) => side === 'floor' ? rate < limit : rate > 
 // again. 0.1% is about 0.009 on GBP/CNY, roughly a quarter of a quiet day.
 export const REARM = 0.001;
 
+// The rate a side must get back past to re-arm.
+export const rearmAt = (side, limit) => side === 'floor' ? limit * (1 + REARM) : limit * (1 - REARM);
 const rearmed = (side, rate, limit) =>
-  side === 'floor' ? rate > limit * (1 + REARM) : rate < limit * (1 - REARM);
+  side === 'floor' ? rate > rearmAt(side, limit) : rate < rearmAt(side, limit);
 
 // Decide which alerts to send. Each side alerts when the rate crosses its
 // limit (below a floor, above a ceiling), then again every REPEAT_MS while
@@ -151,6 +153,7 @@ export function alertMessage({ pair, side, rate, limit, repeat }) {
     `CITIC buy price: 1 ${pair} = ${rate.toFixed(4)} CNY\n` +
     `${name}: ${limit.toFixed(4)}\n` +
     (repeat ? `A reminder every ${REPEAT_MS / 3600_000} hours while it stays ${where}.\n` : '') +
+    `Re-arms once back ${side === 'floor' ? 'above' : 'below'} ${rearmAt(side, limit).toFixed(4)}.\n` +
     `https://fx.etarc.net`;
 }
 

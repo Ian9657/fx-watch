@@ -54,12 +54,12 @@ The same rules open [`public/style.css`](public/style.css).
 ## How it works
 
 ```mermaid
-flowchart LR
-  P["Web app<br/>public/"] -- "/api/*" --> W["Cloudflare Worker<br/>src/worker.js"]
-  W -- "price now" --> C["CITIC rate feed"]
-  T["Cron, every 10 min"] --> W
-  W <--> K[("Workers KV<br/>limits · alert state ·<br/>one record per day")]
-  W -- "alerts" --> G["Telegram"]
+flowchart TB
+  app["Web app<br/>public/"] -- "/api/*" --> worker["Cloudflare Worker<br/>src/worker.js"]
+  cron(["Cron · every 10 min"]) --> worker
+  worker -- "price" --> citic["CITIC rate feed"]
+  worker <-- "read · write" --> kv[("Workers KV")]
+  worker -- "alerts" --> tg["Telegram"]
 ```
 
 | Part | Where |

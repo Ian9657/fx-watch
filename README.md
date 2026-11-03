@@ -106,3 +106,7 @@ Set the following secrets in the Cloudflare dashboard (fx-watch → Settings →
 Prices come from the public feed behind the rate table on citicbank.com and are for reference only. The price shown in the CITIC app when you trade is final. This project is not affiliated with China CITIC Bank.
 
 Fonts (Cinzel, Cormorant Garamond, Playfair Display, Special Elite) are self-hosted under the SIL Open Font License.
+
+## License
+
+[MIT](LICENSE)

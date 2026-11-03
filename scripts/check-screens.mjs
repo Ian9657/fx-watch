@@ -23,7 +23,7 @@ const password = process.env.PASSWORD || 'localtest'; // .dev.vars
 
 rmSync('screens', { recursive: true, force: true });
 mkdirSync('screens/.profile', { recursive: true });
-const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=9339', '--user-data-dir=screens/.profile', '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
+const chrome = spawn(CHROME, ['--headless=new', '--mute-audio', '--remote-debugging-port=9339', '--user-data-dir=screens/.profile', '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
 let targets;
 for (let i = 0; i < 60 && !targets; i++) { await sleep(250); targets = await fetch('http://127.0.0.1:9339/json/list').then(r => r.json(), () => null); }
 const ws = new WebSocket(targets.find(t => t.type === 'page').webSocketDebuggerUrl);

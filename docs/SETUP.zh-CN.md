@@ -69,6 +69,7 @@ git push
 | 现象 | 原因 |
 |---|---|
 | `Wrong password.` | 密码与 `EDIT_PASSWORD` 不一致。密钥可在 Settings → Variables and Secrets 中修改。 |
+| `Too many requests. Try again in a minute.` | 同一地址一分钟内的 API 请求超过 60 次。等一分钟即可；上限在 `wrangler.jsonc` 的 `ratelimits` 中设置。 |
 | `TELEGRAM FAILED AT …` | Telegram 拒绝了消息：检查 token 和 chat ID，并确认至少给机器人发过一条消息。 |
 | `ALERTS LAST CHECKED …` | 定时任务超过 25 分钟没有运行。检查 Worker 的 Settings → Trigger Events。 |
 | 构建卡在 “Initializing build environment” | Cloudflare 端的延迟。在 Worker 的 Deployments 页面重试构建。 |

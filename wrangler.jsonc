@@ -5,5 +5,8 @@
   "assets": { "directory": "./public", "binding": "ASSETS" },
   "triggers": { "crons": ["*/10 * * * *"] },
   "kv_namespaces": [{ "binding": "STORE" }],
+  // Requests to /api/* per address per minute (src/worker.js), counted in
+  // each Cloudflare location. namespace_id is any integer unique to the account.
+  "ratelimits": [{ "name": "API_LIMIT", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }],
   "observability": { "enabled": true }
 }

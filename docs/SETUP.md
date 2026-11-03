@@ -69,6 +69,7 @@ The push redeploys. Saved limits and history are kept, since they live in KV.
 | What you see | Cause |
 |---|---|
 | `Wrong password.` | The password doesn't match `EDIT_PASSWORD`. Secrets can be changed under Settings → Variables and Secrets. |
+| `Too many requests. Try again in a minute.` | More than 60 API requests in a minute from one address. Wait a minute; the limit is in `wrangler.jsonc` under `ratelimits`. |
 | `TELEGRAM FAILED AT …` | Telegram rejected the message: check the token and chat ID, and that you have messaged the bot at least once. |
 | `ALERTS LAST CHECKED …` | The Cron Trigger hasn't run for over 25 minutes. Check the Worker's Settings → Trigger Events. |
 | A build stuck at "Initializing build environment" | A Cloudflare-side delay. Retry the build from the Worker's Deployments tab. |

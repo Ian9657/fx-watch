@@ -177,6 +177,15 @@ test('the knob is saved with the settings, one to four currencies', async () => 
   assert.deepEqual(store.json('limits').GBP, limits.GBP); // limits left out stay as they were
 });
 
+test('API requests over the limit are refused before the password is checked', async () => {
+  let left = 2;
+  const e = { ...env(fakeKV({ limits })), API_LIMIT: { limit: async ({ key }) => { assert.equal(key, '1.2.3.4'); return { success: left-- > 0 }; } } };
+  const call = pw => worker.fetch(new Request('https://x/api/settings', { headers: { Authorization: `Bearer ${pw}`, 'CF-Connecting-IP': '1.2.3.4' } }), e);
+  assert.equal((await call('wrong')).status, 401);
+  assert.equal((await call('pw')).status, 200);
+  assert.equal((await call('pw')).status, 429);
+});
+
 test('a check carries on when a currency is missing, and fails when all are', async () => {
   const store = fakeKV({ limits });
   const usdOnly = 'cb(' + JSON.stringify({ content: { resultList: [{ quotePriceDate: '2026年10月27日', quotePriceTime: '20:00:00', curCode: '014001', cstexcSellPrice: '669.00', cstexcBuyPrice: '666.00' }] } }) + ')';

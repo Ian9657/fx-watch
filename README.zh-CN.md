@@ -72,6 +72,7 @@ Workers KV，绑定名 `STORE`：
 ## 安全
 
 - 所有 `/api/*` 路由都需要 `Authorization: Bearer <password>`；Worker 对 SHA-256 摘要使用 `crypto.subtle.timingSafeEqual` 比较。
+- 校验密码之前，先由 [Rate Limiting 绑定](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)限制每个地址每分钟最多 60 次 API 请求（按 Cloudflare 节点分别计数），以减慢密码猜测。页面自身每分钟约 10 次请求。
 - 密码按设备保存在 `localStorage`，收到 401 时清除并显示锁屏。
 - 对外请求只有中信汇率数据和 Telegram Bot API。不加载任何第三方脚本、字体或统计；字体自行托管。
 

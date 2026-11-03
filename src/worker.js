@@ -161,7 +161,13 @@ async function check(env) {
 }
 
 async function api(request, env, path) {
-  // The whole app is private: every API call needs the password.
+  // The whole app is private: every API call needs the password. Requests
+  // are counted per address before the password is checked, so guessing it
+  // is slowed to API_LIMIT a minute (the page itself makes about ten).
+  if (env.API_LIMIT) {
+    const { success } = await env.API_LIMIT.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
+    if (!success) return json({ error: 'Too many requests. Try again in a minute.' }, 429);
+  }
   if (!(await authorized(request, env))) return json({ error: 'Locked' }, 401);
 
   if (path === '/api/rates') {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, TAPE_LENGTH, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage, failingMessage, recoveredMessage } from '../src/logic.js';
+import { parseCitic, CODES, TAPE_LENGTH, toRow, appendRow, normalizeDay, pairRows, hourly, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage, failingMessage, recoveredMessage } from '../src/logic.js';
 
 const none = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
 const limits = (gbp, usd = {}) => ({
@@ -133,13 +133,37 @@ test('test message does not claim a limit was crossed', () => {
   assert.doesNotMatch(msg, /your (floor|ceiling)/);
 });
 
-test('each new quote is added to the day once, rounded to 4 places', () => {
-  let rows = [];
-  rows = appendRow(rows, toRow({ t: 1, GBP: 8.934099999999999, USD: 6.6879 }));
-  const same = appendRow(rows, toRow({ t: 1, GBP: 8.9341, USD: 6.6879 }));
-  assert.equal(same, rows); // unchanged, so nothing to write
-  rows = appendRow(rows, toRow({ t: 2, GBP: 8.91, USD: 6.69 }));
-  assert.deepEqual(rows, [[1, 8.9341, 6.6879], [2, 8.91, 6.69]]);
+test('each new quote is added to the day once, with every currency as quoted', () => {
+  const quotes = { GBP: { sell: 893.41, buy: 886.7 }, USD: { sell: 668.79, buy: 666.34 }, JPY: { sell: 4.2364, buy: 4.1952 } };
+  let rows = appendRow([], toRow(1, quotes));
+  assert.equal(appendRow(rows, toRow(1, quotes)), rows); // unchanged, so nothing to write
+  rows = appendRow(rows, toRow(2, quotes));
+  assert.equal(rows.length, 2);
+  const row = rows[0], n = CODES.length;
+  assert.equal(row.length, 1 + 2 * n);
+  assert.equal(row[1 + CODES.indexOf('JPY')], 4.2364);
+  assert.equal(row[1 + n + CODES.indexOf('JPY')], 4.1952);
+  assert.equal(row[1 + CODES.indexOf('EUR')], null); // not in this feed
+  // The page's rows: per-unit sell prices, with no float noise.
+  assert.deepEqual(pairRows({ codes: CODES, rows }), [[1, 8.9341, 6.6879], [2, 8.9341, 6.6879]]);
+});
+
+test('reads day records kept before every currency was', () => {
+  const old = normalizeDay([[1, 8.9341, 6.6879], [2, 8.91, null]]);
+  assert.deepEqual(old.codes, CODES);
+  assert.equal(old.rows[0][1 + CODES.indexOf('GBP')], 893.41);
+  assert.deepEqual(pairRows(old), [[1, 8.9341, 6.6879], [2, 8.91, null]]);
+  // Kept under another list of codes: laid out again by code.
+  const other = normalizeDay({ codes: ['GBP', 'XYZ'], rows: [[3, 900, 1, 890, 2]] });
+  assert.deepEqual(pairRows(other), [[3, 9, null]]);
+  assert.equal(other.rows[0][1 + CODES.length + CODES.indexOf('GBP')], 890);
+  assert.deepEqual(normalizeDay(null).rows, []);
+});
+
+test('a rollup keeps the last quote of each hour', () => {
+  const h = 3600, rows = [[0], [600], [h - 1], [h], [2 * h + 5], [2 * h + 600]];
+  assert.deepEqual(hourly(rows).map(r => r[0]), [h - 1, h, 2 * h + 600]);
+  assert.deepEqual(hourly([]), []);
 });
 
 test('ticker tape is the newest quotes first', () => {

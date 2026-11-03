@@ -1,4 +1,4 @@
-import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, DAY_TTL, dayKey, toRow, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
+import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, FULL_DAYS, DAY_TTL, dayKey, rollupKey, toRow, normalizeDay, pairRows, hourly, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
 
 // Two records, each with one writer, so neither can overwrite the other:
 // 'limits' is written only when you save settings, and 'data' (alert state
@@ -30,17 +30,33 @@ async function fetchCitic() {
   return parseCitic(await res.text());
 }
 
-const readDay = async (env, day) => (await env.STORE.get(dayKey(day), 'json')) || [];
-const writeDay = (env, day, rows) => env.STORE.put(dayKey(day), JSON.stringify(rows), { expirationTtl: DAY_TTL });
+const readDay = async (env, day) => normalizeDay(await env.STORE.get(dayKey(day), 'json'));
+const writeDay = (env, day, record) => env.STORE.put(dayKey(day), JSON.stringify(record), { expirationTtl: DAY_TTL });
 
 // Add a new quote to today's history record: one write, and none when the
 // quote hasn't changed since the last check.
 async function record(env, quotes) {
-  const t = Math.max(...PAIRS.map(p => quotes[p].time));
+  const t = Math.max(...Object.values(quotes).map(q => q.time));
   const day = beijingDay(t * 1000);
-  const rows = await readDay(env, day);
-  const next = appendRow(rows, toRow({ t, ...Object.fromEntries(PAIRS.map(p => [p, quotes[p].price])) }));
-  if (next !== rows) await writeDay(env, day, next);
+  const rec = await readDay(env, day);
+  const rows = appendRow(rec.rows, toRow(t, quotes));
+  if (rows !== rec.rows) await writeDay(env, day, { ...rec, rows });
+}
+
+// Once a day is over, keep its rollup (logic.js): one write a day.
+async function rollUp(env) {
+  const day = daysBack(beijingDay(Date.now()), 2)[1];
+  if (await env.STORE.get(rollupKey(day))) return;
+  const rec = await readDay(env, day);
+  await env.STORE.put(rollupKey(day), JSON.stringify({ ...rec, rows: hourly(rec.rows) }), { expirationTtl: DAY_TTL });
+}
+
+// A past day for the chart: its rollup, or the day hourly if it has none.
+async function readRollup(env, day) {
+  const kept = await env.STORE.get(rollupKey(day), 'json');
+  if (kept) return normalizeDay(kept);
+  const rec = await readDay(env, day);
+  return { ...rec, rows: hourly(rec.rows) };
 }
 
 // History used to be one record for all 90 days, with the last price of
@@ -50,8 +66,8 @@ async function splitOldHistory(env) {
   if (!old) return;
   for (const [day, rows] of Object.entries(splitByDay(old))) {
     const have = await readDay(env, day);
-    const merged = [...rows, ...have].sort((a, b) => a[0] - b[0]).filter((r, i, all) => r[0] !== all[i - 1]?.[0]);
-    await writeDay(env, day, merged);
+    const merged = [...normalizeDay(rows).rows, ...have.rows].sort((a, b) => a[0] - b[0]).filter((r, i, all) => r[0] !== all[i - 1]?.[0]);
+    await writeDay(env, day, { ...have, rows: merged });
   }
   await Promise.all(['history', 'daily', 'tape'].map(key => env.STORE.delete(key)));
 }
@@ -61,7 +77,7 @@ async function splitOldHistory(env) {
 async function recentRows(env, want) {
   let rows = [];
   for (const day of daysBack(beijingDay(Date.now()), 8)) {
-    rows = [...(await readDay(env, day)), ...rows];
+    rows = [...pairRows(await readDay(env, day)), ...rows];
     if (rows.length >= want) break;
   }
   return rows;
@@ -72,7 +88,7 @@ async function recentRows(env, want) {
 // without one, Beijing midnight.
 async function previousClose(env, before) {
   for (const day of daysBack(beijingDay(before * 1000), 8)) {
-    const row = (await readDay(env, day)).filter(r => r[0] < before).at(-1);
+    const row = pairRows(await readDay(env, day)).filter(r => r[0] < before).at(-1);
     if (row) return row;
   }
   return null;
@@ -105,6 +121,7 @@ async function check(env) {
     await splitOldHistory(env);
     const quotes = await fetchCitic();
     await record(env, quotes);
+    await rollUp(env);
     const rates = Object.fromEntries(PAIRS.map(p => [p, quotes[p].price]));
     const { alerts, alerted, sentAt } = evaluate(rates, data.limits, data.alerted, data.sentAt);
     let alertError = alerts.length ? null : data.alertError;
@@ -149,8 +166,18 @@ async function api(request, env, path) {
   }
 
   if (path === '/api/history') {
-    const days = daysBack(beijingDay(Date.now()), HISTORY_DAYS + 1).reverse();
-    const history = (await Promise.all(days.map(day => readDay(env, day)))).flat();
+    // ?from=&to= (Beijing days, at most 16): every quote, for the CSV.
+    // Otherwise the chart's: the last FULL_DAYS in full, hourly before.
+    const q = new URL(request.url).searchParams, from = q.get('from'), to = q.get('to');
+    let reads;
+    if (from || to) {
+      const span = (Date.parse(to) - Date.parse(from)) / 86400_000;
+      if (!/^\d{4}-\d\d-\d\d$/.test(from) || !/^\d{4}-\d\d-\d\d$/.test(to) || !(span >= 0 && span < 16)) return json({ error: 'from and to must be days at most 15 apart' }, 400);
+      reads = daysBack(to, span + 1).map(day => readDay(env, day));
+    } else {
+      reads = daysBack(beijingDay(Date.now()), HISTORY_DAYS + 1).map((day, i) => i < FULL_DAYS ? readDay(env, day) : readRollup(env, day));
+    }
+    const history = (await Promise.all(reads)).reverse().flatMap(rec => pairRows(rec));
     return json({ history });
   }
 

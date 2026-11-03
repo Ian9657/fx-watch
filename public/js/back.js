@@ -30,17 +30,23 @@ export async function loadHistory() {
 }
 
 // The whole recorded history as CSV, downloaded: Beijing time (CITIC's
-// own), the epoch seconds, and a column per currency.
+// own), the epoch seconds, and a column per currency. The chart's history
+// is hourly before the last week, so this asks for every quote, 15 days at
+// a time, as far back as history is kept.
 export async function downloadHistory() {
-  historyAt = 0; // always fresh
-  await loadHistory();
-  if (!history.length) throw new Error('No history recorded yet.');
   const beijing = t => new Date((t + 8 * HOUR) * 1000).toISOString().slice(0, 19) + '+08:00';
-  const csv = [['time', 'unix', ...PAIRS], ...history.map(([t, ...prices]) => [beijing(t), t, ...prices.map(v => v ?? '')])]
+  const day = t => beijing(t).slice(0, 10);
+  const now = Date.now() / 1000, rows = [];
+  for (let back = 0; back < 91; back += 15) {
+    const to = day(now - back * DAY), from = day(now - Math.min(back + 14, 90) * DAY);
+    rows.unshift(...(await getJSON(`/api/history?from=${from}&to=${to}`)).history);
+  }
+  if (!rows.length) throw new Error('No history recorded yet.');
+  const csv = [['time', 'unix', ...PAIRS], ...rows.map(([t, ...prices]) => [beijing(t), t, ...prices.map(v => v ?? '')])]
     .map(row => row.join(',')).join('\n') + '\n';
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
-    download: `fx-watch-history-${beijing(Date.now() / 1000).slice(0, 10)}.csv`,
+    download: `fx-watch-history-${day(now)}.csv`,
   });
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);

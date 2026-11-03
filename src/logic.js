@@ -2,43 +2,88 @@
 
 export const PAIRS = ['GBP', 'USD'];
 
-// CITIC Bank currency codes in its rate feed.
-const CITIC_CODES = { GBP: '012001', USD: '014001' };
+// CITIC Bank's code for every currency in its rate feed, in the order
+// history records them. GBP and USD (PAIRS) are the ones shown and alerted on.
+export const CURRENCIES = {
+  USD: '014001', GBP: '012001', EUR: '051001', JPY: '027001', HKD: '013001',
+  CAD: '028001', CHF: '015001', NZD: '062001', AUD: '029001', SGD: '018001',
+  DKK: '022001', SEK: '021001', NOK: '023001', KRW: '085001', THB: '038001',
+  MOP: '081001', KZT: '031001', SAR: '065001', ZAR: '096001', IDR: '041001',
+};
+export const CODES = Object.keys(CURRENCIES);
 
 // CITIC quotes are Beijing time (UTC+8).
 const BEIJING = 8 * 3600 * 1000;
 
-// CITIC rate feed (JSONP) → { GBP: { price, time }, USD: ... }
-// price = customer buy price (客户购汇价) per 1 unit; time = epoch seconds.
+// CITIC rate feed (JSONP) → { GBP: { price, sell, buy, time }, ... } for
+// every currency in it. sell is the customer buy price (客户购汇价) and buy
+// the customer sell price (客户结汇价), both as quoted: CNY per 100 units.
+// price is sell per 1 unit, for GBP and USD, which must be present.
 export function parseCitic(text) {
   const json = JSON.parse(text.slice(text.indexOf('(') + 1, text.lastIndexOf(')')));
   const rows = json?.content?.resultList;
   if (!Array.isArray(rows)) throw new Error('Unexpected CITIC response');
-  const rates = {};
-  for (const pair of PAIRS) {
-    const row = rows.find(r => r.curCode === CITIC_CODES[pair]);
-    // The feed gives CNY per 100 units; dividing leaves float noise
-    // (893.41 / 100 = 8.934099999999999), so round to the 4 places quoted.
-    const price = +(Number(row?.cstexcSellPrice) / 100).toFixed(4);
-    if (!Number.isFinite(price) || price <= 0) throw new Error(`No CITIC price for ${pair}`);
+  const quotes = {};
+  for (const code of CODES) {
+    const row = rows.find(r => r.curCode === CURRENCIES[code]);
+    const sell = Number(row?.cstexcSellPrice), buy = Number(row?.cstexcBuyPrice);
+    if (!Number.isFinite(sell) || sell <= 0) {
+      if (PAIRS.includes(code)) throw new Error(`No CITIC price for ${code}`);
+      continue;
+    }
     const [y, m, d] = row.quotePriceDate.match(/\d+/g).map(Number);
     const [hh, mm, ss] = row.quotePriceTime.split(':').map(Number);
     const time = (Date.UTC(y, m - 1, d, hh, mm, ss) - BEIJING) / 1000;
-    rates[pair] = { price, time };
+    quotes[code] = { price: perUnit(sell), sell, buy: Number.isFinite(buy) && buy > 0 ? buy : null, time };
   }
-  return rates;
+  return quotes;
 }
 
-// Price history is kept one record per Beijing day: [t, GBP, USD] rows,
-// oldest first, one per new quote the 10-minute check sees. A day holds at
-// most 144 rows (about 4 KB), so a check reads and writes only today's
-// record, and each record expires on its own after HISTORY_DAYS (+2 for
-// days that straddle the cut-off).
+// The feed gives CNY per 100 units; dividing leaves float noise
+// (893.41 / 100 = 8.934099999999999), so round to the 4 places quoted.
+export const perUnit = v => +(v / 100).toFixed(4);
+
+// Price history is kept one record per Beijing day,
+//   { codes: [...CODES], rows: [[t, ...sell per code, ...buy per code]] },
+// oldest first, one row per new quote the 10-minute check sees, prices as
+// quoted (per 100 units) and null where CITIC had none. A day holds at most
+// 144 rows (about 50 KB). Each record expires on its own after HISTORY_DAYS
+// (+2 for days that straddle the cut-off).
+//
+// Reading 90 full days would cost more CPU than a free Worker request has,
+// so once a day is over the check also keeps a rollup of it (r:): the last
+// row of each hour. The chart uses full days for the last week and rollups
+// before that.
 export const HISTORY_DAYS = 90;
+export const FULL_DAYS = 8;
 export const DAY_TTL = (HISTORY_DAYS + 2) * 86400; // seconds
 export const dayKey = day => `h:${day}`;
+export const rollupKey = day => `r:${day}`;
 
-export const toRow = sample => [sample.t, ...PAIRS.map(p => +sample[p].toFixed(4))];
+export const toRow = (t, quotes) => [t, ...CODES.map(c => quotes[c]?.sell ?? null), ...CODES.map(c => quotes[c]?.buy ?? null)];
+
+// A stored day record in today's layout. Records from before every
+// currency was kept are [t, GBP, USD] rows of per-unit sell prices; a
+// record kept under another list of codes is laid out again.
+export function normalizeDay(value) {
+  if (!value) return { codes: CODES, rows: [] };
+  const old = Array.isArray(value)
+    ? { codes: PAIRS, rows: value.map(([t, ...prices]) => [t, ...prices.map(v => v == null ? null : +(v * 100).toFixed(4)), ...prices.map(() => null)]) }
+    : value;
+  if (old.codes.join() === CODES.join()) return old;
+  const n = old.codes.length, at = CODES.map(c => old.codes.indexOf(c));
+  return { codes: CODES, rows: old.rows.map(r => [r[0], ...at.map(i => i < 0 ? null : r[1 + i]), ...at.map(i => i < 0 ? null : r[1 + n + i])]) };
+}
+
+// Rows of [t, ...per-unit sell prices of `pairs`]: the shape the page, the
+// tape and yesterday's close use.
+export function pairRows(record, pairs = PAIRS) {
+  const at = pairs.map(p => 1 + record.codes.indexOf(p));
+  return record.rows.map(r => [r[0], ...at.map(i => i < 1 || r[i] == null ? null : perUnit(r[i]))]);
+}
+
+// The last row of each hour.
+export const hourly = rows => rows.filter((r, i) => i === rows.length - 1 || Math.floor(rows[i + 1][0] / 3600) !== Math.floor(r[0] / 3600));
 
 // Add a row to a day's rows unless it repeats the last quote.
 export function appendRow(rows, row) {

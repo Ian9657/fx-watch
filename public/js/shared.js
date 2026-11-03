@@ -9,8 +9,8 @@ export const unit = p => p === 'JPY' ? 100 : 1; // CITIC quotes yen per 100
 export const per = p => `${unit(p) === 1 ? '' : `${unit(p)} `}${p}`;
 export const SIDES = ['floor', 'ceiling'];
 
-// The public demo: the same page on recorded GBP and USD prices with sample
-// limits, no password and no settings. It keeps its own saved choices.
+// The public demo: the same page on made-up GBP and USD prices (js/demo.js),
+// no password and no settings. It keeps its own saved choices.
 export const DEMO = location.pathname === '/demo';
 export const REPO = 'https://github.com/Ian9657/fx-watch';
 const saved = key => DEMO ? `demo:${key}` : key;

@@ -103,7 +103,7 @@ flowchart TB
 |---|---|
 | `src/worker.js` | API routes (`/api/rates`, `/api/history`, `/api/settings`, `/api/test`), scheduled check, KV I/O, Telegram |
 | `src/logic.js` | Pure functions: JSONP feed parsing, history rows, alert evaluation, messages, settings migrations |
-| `public/js/` | ES modules, one per part of the page: `dial`, `tape`, `back` (chart and bezel), `sheet`, `shared`, `app` (start-up) |
+| `public/js/` | ES modules, one per part of the page: `dial`, `tape`, `back` (chart and bezel), `sheet`, `lock` (lock screen), `spring`, `demo` (the demo's made-up data), `shared`, `app` (start-up) |
 | `public/sw.js` | Service worker for the offline copy |
 | `test/` | `node:test` suites: the logic, and the Worker end to end against an in-memory KV with fake CITIC and Telegram |
 | `scripts/check-screens.mjs` | Headless Chrome over the DevTools protocol, at six viewport sizes |

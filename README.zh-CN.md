@@ -103,7 +103,7 @@ flowchart TB
 |---|---|
 | `src/worker.js` | API 路由（`/api/rates`、`/api/history`、`/api/settings`、`/api/test`）、定时检查、KV 读写、Telegram |
 | `src/logic.js` | 纯函数：JSONP 报价解析、历史行处理、提醒判定、消息文本、设置迁移 |
-| `public/js/` | ES 模块，页面每个部分一个：`dial`、`tape`、`back`（走势图和表圈）、`sheet`、`shared`、`app`（启动） |
+| `public/js/` | ES 模块，页面每个部分一个：`dial`、`tape`、`back`（走势图和表圈）、`sheet`、`lock`（锁屏）、`spring`、`demo`（演示用的虚拟数据）、`shared`、`app`（启动） |
 | `public/sw.js` | 离线副本的 Service Worker |
 | `test/` | `node:test` 测试：逻辑单元测试，以及用内存 KV、模拟中信和 Telegram 的 Worker 端到端测试 |
 | `scripts/check-screens.mjs` | 通过 DevTools 协议驱动无界面 Chrome，覆盖六种视口尺寸 |

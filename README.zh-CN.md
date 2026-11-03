@@ -121,6 +121,8 @@ npm run check:screens  # 需先运行 npm run dev
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Ian9657/fx-watch)
 
+从创建 Telegram 机器人到安装到手机的完整步骤：[docs/SETUP.zh-CN.md](docs/SETUP.zh-CN.md)。
+
 按钮会把仓库复制到你的 GitHub 账号，创建 KV 命名空间，并通过 Workers Builds 部署 Worker 及其 Cron Trigger，之后推送到 `main` 会自动重新部署。部署时需要填写三个密钥，见 [`.dev.vars.example`](.dev.vars.example)：
 
 | 名称 | 用途 |

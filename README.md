@@ -121,6 +121,8 @@ At each size, `check:screens` asserts that the layout fits one screen without sc
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Ian9657/fx-watch)
 
+Step by step, from creating the Telegram bot to installing on a phone: [docs/SETUP.md](docs/SETUP.md).
+
 The button copies the repository to your GitHub account, creates the KV namespace, and deploys the Worker with its Cron Trigger through Workers Builds, so later pushes to `main` redeploy. It asks for three secrets, listed in [`.dev.vars.example`](.dev.vars.example):
 
 | Name | Purpose |

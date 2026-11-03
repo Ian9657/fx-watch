@@ -2,7 +2,7 @@
 // for that currency's floor and ceiling, and whether it's on the knob.
 // While it's open the dial reads the currency in the sheet and previews its
 // draft, so you can see where a new floor or ceiling would sit before saving.
-import { $, PAIRS, SIDES, KNOB_MAX, state, store, getJSON, Locked, lock, draftLimits, crossed, pressable, sound, haptic } from './shared.js';
+import { $, PAIRS, SIDES, KNOB_MAX, state, store, getJSON, Locked, lock, draftLimits, crossed, pressable, feel, sound, haptic } from './shared.js';
 import { render } from './dial.js';
 import { downloadHistory } from './back.js';
 
@@ -161,6 +161,7 @@ function syncSide(side) {
   const { on } = state.draft[side];
   $(`toggle-${side}`).setAttribute('aria-pressed', String(on));
   $(`toggle-${side}`).textContent = on ? 'ON' : 'OFF';
+  feel($(`toggle-${side}`)); // the new text replaced its switch
   $(`row-${side}`).classList.toggle('off', !on);
 }
 function toggleSide(side) {
@@ -185,6 +186,7 @@ function syncKnob() {
   const on = state.knobDraft.includes(state.pair);
   $('toggle-knob').setAttribute('aria-pressed', String(on));
   $('toggle-knob').textContent = on ? 'KNOB ON' : 'KNOB OFF';
+  feel($('toggle-knob'));
 }
 function toggleKnob() {
   const list = state.knobDraft, { pair } = state;
@@ -420,9 +422,12 @@ pressable($('export'));
 $('sheet-close').addEventListener('click', closeSheet);
 $('sheet-backdrop').addEventListener('click', closeSheet);
 pressable($('toggle-knob'), () => haptic(8));
+feel($('toggle-knob'));
 $('toggle-knob').addEventListener('click', () => { sound('clack'); toggleKnob(); });
 for (const side of SIDES) {
   pressable($(`toggle-${side}`), () => haptic(8));
+  feel($(`toggle-${side}`));
+  feel($(`now-${side}`));
   $(`toggle-${side}`).addEventListener('click', () => { sound('clack'); toggleSide(side); });
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.draft) closeSheet(); });

@@ -1,6 +1,6 @@
 // The front of the watch: the dial, the digit window, the status line and
 // the currency knob.
-import { $, store, state, time, per, limitsFor, span, position, pressable, sound, haptic } from './shared.js';
+import { $, store, state, time, per, limitsFor, span, position, pressable, feel, sound, haptic } from './shared.js';
 import { drawTape } from './tape.js';
 import { drawChart, turned } from './back.js';
 
@@ -268,6 +268,7 @@ function buildSelector() {
     b.dataset.pair = p;
     b.innerHTML = `<span class="lamp-dot"></span><span class="caps">${p}</span>`;
     pressable(b);
+    feel(b);
     b.addEventListener('click', () => selectPair(p));
     return b;
   };
@@ -288,6 +289,7 @@ function detent(next) {
   selectPair(next);
 }
 pressable(knob);
+feel(knob);
 let turn = null, turnedByDrag = false;
 knob.addEventListener('pointerdown', e => {
   knob.setPointerCapture(e.pointerId);

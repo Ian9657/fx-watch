@@ -140,22 +140,22 @@ export function sound(kind, level = 1) {
   } catch {}
 }
 
-// A tap felt through the fingertip. Android has the vibration API; iPhone
-// has none for web pages, but from iOS 18 Safari gives a switch control a
-// light tap when it flips, so a hidden one is flipped instead. Both only
-// work inside a touch or click, which is when this is called.
-let iosSwitch;
+// A tap felt through the fingertip. Android has the vibration API, called
+// as a control moves. iPhone has none for web pages; Safari does give a
+// light tap when a switch control is flipped, but only by the finger itself,
+// not from script. So on iPhone each control that is tapped carries a clear
+// switch over its face (feel), and a drag gives no tap, only the sound.
+const IOS = !navigator.vibrate && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent)));
 export function haptic(ms = 6) {
-  if (navigator.vibrate) return void navigator.vibrate(ms);
-  if (!/iP(hone|ad|od)/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent))) return;
-  if (!iosSwitch) {
-    iosSwitch = document.createElement('label');
-    iosSwitch.setAttribute('aria-hidden', 'true');
-    iosSwitch.style.cssText = 'position:fixed;left:-100px;top:0;opacity:0;pointer-events:none';
-    iosSwitch.innerHTML = '<input type="checkbox" switch tabindex="-1">';
-    document.body.append(iosSwitch);
-  }
-  iosSwitch.click();
+  navigator.vibrate?.(ms);
+}
+export function feel(el) {
+  if (!IOS || el.querySelector(':scope > .feel')) return;
+  const skin = Object.assign(document.createElement('input'), { type: 'checkbox', tabIndex: -1, className: 'feel' });
+  skin.setAttribute('switch', '');
+  skin.setAttribute('aria-hidden', 'true');
+  el.classList.add('felt');
+  el.append(skin);
 }
 
 // Phones don't show :active, so controls get a .pressed class from the

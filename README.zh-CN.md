@@ -49,7 +49,7 @@
 
 **客户端**
 - 可安装的 PWA。Service Worker 采用网络优先、缓存兜底；缓存的 API 响应带 `X-Offline` 时间戳，页面据此标注过期数据。
-- 音效由 Web Audio 用滤波噪声实时合成，不含音频文件。触感反馈使用 `navigator.vibrate`，iOS Safari 上通过切换一个隐藏的 `<input type="checkbox" switch>` 实现。
+- 音效由 Web Audio 用滤波噪声实时合成，不含音频文件。安卓上的触感反馈使用 `navigator.vibrate`。iOS Safari 只有在手指亲自拨动 `<input type="checkbox" switch>` 时才会轻震，所以每个点按的控件表面都覆盖一个透明的开关；拖动操作在 iPhone 上只有声音。
 - 遵循 `prefers-reduced-motion`。
 - 设置面板可将全部历史导出为 CSV：`time`（ISO 8601，北京时间）、`unix`，然后每个币种一列，按单位计价（日元按每 100）。在浏览器里由 `/api/history` 生成。
 

@@ -58,9 +58,11 @@ Your repository is a copy, not a fork. To bring in later changes:
 
 ```sh
 git remote add upstream https://github.com/Ian9657/fx-watch.git
-git pull upstream main
+git pull upstream main --allow-unrelated-histories
 git push
 ```
+
+Your repository is a copy, not a fork, so the first pull needs `--allow-unrelated-histories`, and `wrangler.jsonc` may conflict if the deploy wrote your KV namespace ID into it: keep your ID.
 
 The push redeploys. Saved limits and history are kept, since they live in KV.
 
@@ -68,6 +70,7 @@ The push redeploys. Saved limits and history are kept, since they live in KV.
 
 | What you see | Cause |
 |---|---|
+| `EDIT_PASSWORD is not set on this Worker.` | The secret is missing, or still the example value `choose-a-password`. Set it under Settings → Variables and Secrets. |
 | `Wrong password.` | The password doesn't match `EDIT_PASSWORD`. Secrets can be changed under Settings → Variables and Secrets. |
 | `Too many requests. Try again in a minute.` | More than 60 API requests in a minute from one address. Wait a minute; the limit is in `wrangler.jsonc` under `ratelimits`. |
 | `TELEGRAM FAILED AT …` | Telegram rejected the message: check the token and chat ID, and that you have messaged the bot at least once. |

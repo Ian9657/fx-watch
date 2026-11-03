@@ -61,6 +61,7 @@ Workers KV, binding `STORE`:
 |---|---|---|
 | `limits` | `{ USD: { floor, ceiling }, GBP: …, … }` for the eight currencies | `PUT /api/settings` only |
 | `knob` | the knob's currencies in order, e.g. `["GBP", "USD"]` | `PUT /api/settings` only |
+| `site` | the site's address, for links in alerts, noted when the page loads or saves | `/api/settings` |
 | `data` | alert state, last check, failure count | the 10-minute check only |
 | `h:YYYY-MM-DD` | one Beijing day: `{ codes, rows }`, a row `[t, …sell, …buy]` per new quote for all 20 currencies, as quoted (per 100 units). ≤144 rows (~50 KB), TTL 92 days | the 10-minute check |
 | `r:YYYY-MM-DD` | the last row of each hour of a finished day, TTL 92 days | the 10-minute check, once a day |
@@ -114,7 +115,7 @@ Requires Node 24.
 cp .dev.vars.example .dev.vars   # then set EDIT_PASSWORD=localtest
 npm run dev            # wrangler dev, http://localhost:8787
 npm test               # node --test
-npm run check:screens  # needs npm run dev
+npm run check:screens  # needs npm run dev; set CHROME to the browser's path off macOS
 ```
 
 At each size, `check:screens` asserts that the layout fits one screen without scrolling and that there are no console errors. It then drives the real controls (turns the watch over, turns the knob, drags a wheel, opens the settings sheet), checks that each one responded, and saves screenshots to `screens/`. CI runs `npm test` on every push to `main`.
@@ -139,7 +140,7 @@ To install on a device, open the site in Safari, then Share → Add to Home Scre
 
 ## Credits
 
-Fonts: Cinzel, Cormorant Garamond, Playfair Display and Special Elite, all under the SIL Open Font License.
+Fonts: Cinzel, Cormorant Garamond and Playfair Display under the SIL Open Font License; Special Elite under Apache 2.0. Licences are in [`public/fonts/licenses`](public/fonts/licenses).
 
 ## License
 

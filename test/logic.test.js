@@ -186,6 +186,9 @@ test('old single history splits into Beijing days', () => {
 });
 
 test('failure and recovery messages say how long alerts were off', () => {
+  assert.ok(!alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }).includes('http'));
+  assert.match(alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }, 'https://a.example'), /\nhttps:\/\/a\.example$/);
+  assert.match(failingMessage({ count: 3, error: 'x' }, 'https://a.example'), /\nhttps:\/\/a\.example$/);
   const msg = failingMessage({ count: 3, error: 'CITIC returned 503' });
   assert.match(msg, /failed 3 times in a row \(about 30 minutes\)/);
   assert.match(msg, /alerts are paused/);

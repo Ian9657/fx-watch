@@ -209,15 +209,15 @@ export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now()) 
   return { alerts, alerted: next, sentAt: nextAt };
 }
 
-export function alertMessage({ pair, side, rate, limit, repeat }) {
+export function alertMessage({ pair, side, rate, limit, repeat }, site) {
   const name = side === 'floor' ? 'Floor' : 'Ceiling';
   const where = side === 'floor' ? 'below' : 'above';
   return `${pair} is ${repeat ? 'still ' : ''}${where} your ${side}\n` +
     `CITIC buy price: ${unit(pair)} ${pair} = ${rate.toFixed(4)} CNY\n` +
     `${name}: ${limit.toFixed(4)}\n` +
     (repeat ? `A reminder every ${REPEAT_MS / 3600_000} hours while it stays ${where}.\n` : '') +
-    `Re-arms once back ${side === 'floor' ? 'above' : 'below'} ${rearmAt(side, limit).toFixed(4)}.\n` +
-    `https://fx.etarc.net`;
+    `Re-arms once back ${side === 'floor' ? 'above' : 'below'} ${rearmAt(side, limit).toFixed(4)}.` +
+    (site ? `\n${site}` : '');
 }
 
 function describeLimits({ floor, ceiling } = {}) {
@@ -240,11 +240,11 @@ export function testMessage(quotes, limits) {
 // again when it recovers.
 export const FAIL_ALERT_AFTER = 3;
 
-export function failingMessage({ count, error }) {
+export function failingMessage({ count, error }, site) {
   return `FX Watch: the price check has failed ${count} times in a row (about ${count * 10} minutes).\n` +
     `Floor and ceiling alerts are paused until it works again.\n` +
-    `Last error: ${error}\n` +
-    `https://fx.etarc.net`;
+    `Last error: ${error}` +
+    (site ? `\n${site}` : '');
 }
 
 export function recoveredMessage({ count }) {

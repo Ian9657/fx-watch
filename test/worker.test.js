@@ -186,6 +186,41 @@ test('API requests over the limit are refused before the password is checked', a
   assert.equal((await call('pw')).status, 429);
 });
 
+test('a site with no password, or the example one, says so and lets nobody in', async () => {
+  for (const EDIT_PASSWORD of [undefined, '', 'choose-a-password']) {
+    const e = { ...env(fakeKV({ limits })), EDIT_PASSWORD };
+    const res = await worker.fetch(new Request('https://x/api/settings', { headers: { Authorization: `Bearer ${EDIT_PASSWORD}` } }), e);
+    assert.equal(res.status, 503);
+    assert.match((await res.json()).error, /EDIT_PASSWORD is not set/);
+  }
+});
+
+test('alerts link to the address the site was opened on, and to nothing before that', async () => {
+  const sent = network(() => citicFeed(8.91, 6.69));
+  const store = fakeKV({ limits });
+  await run(env(store));
+  assert.ok(!sent[0].includes('http'));
+  await worker.fetch(new Request('https://my.example/api/settings', { headers: { Authorization: 'Bearer pw' } }), env(store));
+  assert.equal(await store.get('site'), 'https://my.example');
+  // Opened on another address, it stays; saving from it moves it.
+  await worker.fetch(new Request('https://other.example/api/settings', { headers: { Authorization: 'Bearer pw' } }), env(store));
+  assert.equal(await store.get('site'), 'https://my.example');
+  await worker.fetch(new Request('https://new.example/api/settings', { method: 'PUT', headers: { Authorization: 'Bearer pw' }, body: JSON.stringify({ limits }) }), env(store));
+  assert.equal(await store.get('site'), 'https://new.example');
+  const later = fakeKV({ limits });
+  await later.put('site', 'https://my.example');
+  const again = network(() => citicFeed(8.91, 6.69));
+  await run(env(later));
+  assert.match(again[0], /\nhttps:\/\/my\.example$/);
+});
+
+test('a missing Telegram secret is named in the alert error', async () => {
+  network(() => citicFeed(8.91, 6.69));
+  const store = fakeKV({ limits });
+  await run({ STORE: store, EDIT_PASSWORD: 'pw' });
+  assert.match(store.json('data').alertError.error, /TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set/);
+});
+
 test('the demo page is public, and no API route is', async () => {
   const assets = [];
   const e = { ...env(fakeKV({ limits })), ASSETS: { fetch: async r => { assets.push(new URL(r.url).pathname); return new Response('page'); } } };

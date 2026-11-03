@@ -58,9 +58,11 @@
 
 ```sh
 git remote add upstream https://github.com/Ian9657/fx-watch.git
-git pull upstream main
+git pull upstream main --allow-unrelated-histories
 git push
 ```
+
+你的仓库是复制出来的，不是 fork，所以第一次拉取要加 `--allow-unrelated-histories`。如果部署时把 KV 命名空间 ID 写进了 `wrangler.jsonc`，这里可能出现冲突，保留你自己的 ID 即可。
 
 推送后会自动重新部署。上下限设置和历史记录保存在 KV 中，不受影响。
 
@@ -68,6 +70,7 @@ git push
 
 | 现象 | 原因 |
 |---|---|
+| `EDIT_PASSWORD is not set on this Worker.` | 这个密钥没有设置，或者还是示例值 `choose-a-password`。可在 Settings → Variables and Secrets 中设置。 |
 | `Wrong password.` | 密码与 `EDIT_PASSWORD` 不一致。密钥可在 Settings → Variables and Secrets 中修改。 |
 | `Too many requests. Try again in a minute.` | 同一地址一分钟内的 API 请求超过 60 次。等一分钟即可；上限在 `wrangler.jsonc` 的 `ratelimits` 中设置。 |
 | `TELEGRAM FAILED AT …` | Telegram 拒绝了消息：检查 token 和 chat ID，并确认至少给机器人发过一条消息。 |

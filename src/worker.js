@@ -17,6 +17,7 @@ async function load(env) {
   if (!limits && data?.limits) {
     limits = old.limits;
     await env.STORE.put('limits', JSON.stringify(limits));
+    await env.STORE.put('site', new URL(request.url).origin); // in case it has moved
   }
   // Alert state from before the split says only true, not which limit it was
   // for; that was the limit saved alongside it.
@@ -101,6 +102,7 @@ async function previousClose(env, before) {
 }
 
 async function sendTelegram(env, text) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) throw new Error('TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set');
   const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -109,9 +111,12 @@ async function sendTelegram(env, text) {
   if (!res.ok) throw new Error(`Telegram returned ${res.status}`);
 }
 
+// The example value from .dev.vars.example counts as no password at all, so
+// clicking through the deploy form can't leave a site open to anyone who has read it.
+const passwordSet = env => env.EDIT_PASSWORD && env.EDIT_PASSWORD !== 'choose-a-password';
+
 async function authorized(request, env) {
   const given = request.headers.get('Authorization')?.replace(/^Bearer /, '') || '';
-  if (!env.EDIT_PASSWORD) return false;
   const enc = new TextEncoder();
   const [a, b] = await Promise.all([given, env.EDIT_PASSWORD].map(s => crypto.subtle.digest('SHA-256', enc.encode(s))));
   return crypto.subtle.timingSafeEqual(a, b);
@@ -133,7 +138,7 @@ async function check(env) {
     let alertError = alerts.length ? null : data.alertError;
     for (const alert of alerts) {
       try {
-        await sendTelegram(env, alertMessage(alert));
+        await sendTelegram(env, alertMessage(alert, await env.STORE.get('site')));
       } catch (err) {
         // Retry on the next check: a first alert as if never sent, a repeat
         // as if not yet due.
@@ -153,7 +158,7 @@ async function check(env) {
       told: data.failing?.told ?? false,
     };
     if (failing.count >= FAIL_ALERT_AFTER && !failing.told) {
-      failing.told = await sendTelegram(env, failingMessage(failing)).then(() => true, () => false);
+      failing.told = await sendTelegram(env, failingMessage(failing, await env.STORE.get('site').catch(() => null))).then(() => true, () => false);
     }
     await env.STORE.put('data', JSON.stringify({ alerted: data.alerted, sentAt: data.sentAt, lastCheck: data.lastCheck, alertError: data.alertError, failing }));
     throw err; // logged by Cloudflare as a failed run
@@ -168,6 +173,7 @@ async function api(request, env, path) {
     const { success } = await env.API_LIMIT.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
     if (!success) return json({ error: 'Too many requests. Try again in a minute.' }, 429);
   }
+  if (!passwordSet(env)) return json({ error: 'EDIT_PASSWORD is not set on this Worker. See docs/SETUP.md.' }, 503);
   if (!(await authorized(request, env))) return json({ error: 'Locked' }, 401);
 
   if (path === '/api/rates') {
@@ -194,6 +200,9 @@ async function api(request, env, path) {
   }
 
   if (path === '/api/settings' && request.method === 'GET') {
+    // The alert messages link to the site, and the 10-minute check has no
+    // request to learn its address from, so it's noted here, by the owner's page.
+    if (!(await env.STORE.get('site'))) await env.STORE.put('site', new URL(request.url).origin);
     const [{ limits, lastCheck, alerted, failing, alertError }, rows, knob] = await Promise.all([load(env), recentRows(env, 12), readKnob(env)]);
     // Alert state too, so the page can say which alerts have fired and
     // when they re-arm, and whether checks or sends are failing.
@@ -221,6 +230,7 @@ async function api(request, env, path) {
     // A changed limit can alert straight away: the alert state records the
     // limit each alert was for, so it needn't be touched here.
     await env.STORE.put('limits', JSON.stringify(limits));
+    await env.STORE.put('site', new URL(request.url).origin); // in case it has moved
     if (body.knob !== undefined) await env.STORE.put('knob', JSON.stringify(body.knob));
     return json({ limits, knob: body.knob ?? await readKnob(env) });
   }

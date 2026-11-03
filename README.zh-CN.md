@@ -61,6 +61,7 @@ Workers KV，绑定名 `STORE`：
 |---|---|---|
 | `limits` | 8 种货币的 `{ USD: { floor, ceiling }, GBP: …, … }` | 仅 `PUT /api/settings` |
 | `knob` | 旋钮上的币种及顺序，如 `["GBP", "USD"]` | 仅 `PUT /api/settings` |
+| `site` | 网站地址，用于提醒里的链接，在页面加载或保存时记下 | `/api/settings` |
 | `data` | 提醒状态、上次检查、失败计数 | 仅 10 分钟检查 |
 | `h:YYYY-MM-DD` | 北京时间某一天：`{ codes, rows }`，每个新报价一行 `[t, …购汇, …结汇]`，覆盖全部 20 种货币，按原始报价（每 100 单位）存储。最多 144 行（约 50 KB），TTL 92 天 | 10 分钟检查 |
 | `r:YYYY-MM-DD` | 已结束的一天中每小时的最后一行，TTL 92 天 | 10 分钟检查，每天一次 |
@@ -114,7 +115,7 @@ flowchart TB
 cp .dev.vars.example .dev.vars   # 然后改为 EDIT_PASSWORD=localtest
 npm run dev            # wrangler dev，http://localhost:8787
 npm test               # node --test
-npm run check:screens  # 需先运行 npm run dev
+npm run check:screens  # 需先运行 npm run dev；非 macOS 需用 CHROME 指定浏览器路径
 ```
 
 `check:screens` 在每种尺寸下检查布局是否一屏放下、不出现滚动，控制台是否无报错；然后实际操作控件（翻转怀表、转动旋钮、拖动滚轮、打开设置面板），确认每一项都有响应，并把截图保存到 `screens/`。CI 在每次推送到 `main` 时运行 `npm test`。
@@ -139,7 +140,7 @@ npm run check:screens  # 需先运行 npm run dev
 
 ## 致谢
 
-字体：Cinzel、Cormorant Garamond、Playfair Display、Special Elite，均采用 SIL Open Font License。
+字体：Cinzel、Cormorant Garamond、Playfair Display 采用 SIL Open Font License；Special Elite 采用 Apache 2.0。许可证文本见 [`public/fonts/licenses`](public/fonts/licenses)。
 
 ## 许可证
 

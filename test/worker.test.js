@@ -202,7 +202,9 @@ test('the demo is public and shows only recorded GBP and USD, with sample limits
   assert.equal(body.tape.length, 2);
   const text = JSON.stringify(body);
   assert.ok(!text.includes('8.9321') && !text.includes('alerted') && !text.includes('EUR'));
-  assert.ok(body.limits.GBP.floor < body.limits.GBP.ceiling);
+  // One currency reads TOO HIGH, the other BUY, whatever the price.
+  assert.ok(body.limits.GBP.floor < body.limits.GBP.ceiling && body.limits.GBP.ceiling < body.rates.GBP.price);
+  assert.ok(body.rates.USD.price < body.limits.USD.floor && body.limits.USD.floor < body.limits.USD.ceiling);
 });
 
 test('a check carries on when a currency is missing, and fails when all are', async () => {

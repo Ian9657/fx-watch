@@ -121,17 +121,19 @@ export function beijingDay(ms) {
 export const SIDES = ['floor', 'ceiling'];
 
 // The public demo (/demo): recorded GBP and USD prices only, the last
-// FULL_DAYS of them, with sample limits drawn from their own range, so it
-// shows nothing of the owner's limits or alert state and calls no one.
+// FULL_DAYS of them, with sample limits set around the latest price so one
+// currency always reads TOO HIGH and the other BUY. It shows nothing of the
+// owner's limits or alert state and calls no one.
 export const DEMO_PAIRS = ['GBP', 'USD'];
-function sampleLimits(prices) {
+const DEMO_ZONES = { GBP: 'high', USD: 'buy' };
+function sampleLimits(prices, zone) {
   if (!prices.length) return { floor: null, ceiling: null };
-  const lo = Math.min(...prices), hi = Math.max(...prices), last = prices.at(-1);
-  const flat = hi - lo < last * 0.002; // too narrow a week for bands to read
-  return {
-    floor: +(flat ? last * 0.997 : lo + (hi - lo) * 0.2).toFixed(4),
-    ceiling: +(flat ? last * 1.003 : hi - (hi - lo) * 0.2).toFixed(4),
-  };
+  const last = prices.at(-1);
+  // A band as wide as the week's range, so the chart's trace stays on the
+  // scale. The price sits 30% of it past the limit, the needle well into the zone.
+  const band = Math.max(Math.max(...prices) - Math.min(...prices), last * 0.002);
+  const floor = zone === 'high' ? last - 1.3 * band : last + 0.3 * band;
+  return { floor: +floor.toFixed(4), ceiling: +(floor + band).toFixed(4) };
 }
 // rows: [t, GBP, USD], oldest first. midnight: when today began (epoch s).
 export function demoPayload(rows, midnight) {
@@ -143,7 +145,7 @@ export function demoPayload(rows, midnight) {
     const before = s.filter(r => r[0] < midnight).at(-1);
     return [[p, { price: last[i + 1], time: last[0], previousClose: before?.[i + 1] ?? null }]];
   });
-  const limits = entries((p, i) => [[p, sampleLimits(series(i).map(r => r[i + 1]))]]);
+  const limits = entries((p, i) => [[p, sampleLimits(series(i).map(r => r[i + 1]), DEMO_ZONES[p])]]);
   const tape = rows.slice(-TAPE_LENGTH).reverse().map(([t, ...prices]) => ({ t, ...Object.fromEntries(DEMO_PAIRS.map((p, i) => [p, prices[i]])) }));
   return { pairs: DEMO_PAIRS, history: rows, rates, limits, knob: DEMO_PAIRS, tape };
 }

@@ -30,6 +30,8 @@ CITIC Bank publishes its current buy price and nothing else: no history and no a
 - Turn the bezel to change the span, shown in a date-style window at twelve
 - Your floor and ceiling appear as rings. When the market is closed, the trace holds the last price until a new quote arrives
 
+<p align="center"><img src="docs/turn.webp" width="300" alt="The watch turning over to its chart, the bezel clicking round from 7 to 30 to 90 days, and turning back"></p>
+
 **Alerts**
 - Each currency has an optional floor and ceiling, set with number wheels. The dial previews the change before you save
 - An alert fires once when a limit is crossed and repeats every 4 hours while the price stays outside it. It re-arms only after the price comes back inside by more than 0.1%, so a price hovering at a limit doesn't keep alerting

@@ -1,51 +1,98 @@
+<div align="center">
+
 # FX Watch
 
-A small web app for buying GBP and USD through China CITIC Bank. It shows CITIC's customer buy price and sends a Telegram message when a price drops below your floor or rises above your ceiling.
+**A pocket watch for one exchange rate.**
 
-Live at **[fx.etarc.net](https://fx.etarc.net)**. Works on iPhone and Mac as a home-screen / Dock app. Styled as a ship's engine order telegraph: the needle shows where the price sits between your floor and ceiling.
+Watches China CITIC Bank's GBP and USD buy prices, keeps their history, and sends a Telegram message when a price crosses the floor or ceiling you set.
 
-## What it does
+[**fx.etarc.net**](https://fx.etarc.net) · Cloudflare Workers · no dependencies, no build step
 
-- Shows the CITIC customer buy price (客户购汇价) for GBP→CNY and USD→CNY, refreshed every 30 seconds while open
-- Checks both prices every 10 minutes. Each currency can have a floor (alert when the price drops below it) and a ceiling (alert when it rises above it). Each side alerts when crossed, reminds every 4 hours while the price stays out there, and re-arms only when the price is back inside by more than 0.1%, so a price wobbling around a limit doesn't alert repeatedly. Coming back inside sends nothing
-- Shows the change since yesterday's last price, and a ticker tape of the last few quotes for the currency on the dial (CITIC publishes no history, so the Worker records both)
-- Tap the watch to turn it over: the back is a round chart recorder of the price over 24 hours, 7, 30 or 90 days, with your floor and ceiling as rings. Turn the bezel to change the span, shown in the window at twelve
-- Private: the app asks for a password once per device; without it the API returns nothing
-- Works offline: a service worker (`public/sw.js`) keeps a copy of the app and the last answers, so with no connection it still opens and shows the last prices, marked OFFLINE
-- Floors and ceilings are set with number wheels in the app (drag or tap each digit); the dial previews the change before you save
+<br>
 
-Prices come from the feed behind the public rate table on citicbank.com. They are for reference only; the price in the CITIC app when you trade is final.
+<img src="docs/front.jpg" width="300" alt="The front of the watch: the needle in the TOO HIGH band, the price on number drums, and the floor and ceiling below"> &nbsp;&nbsp;
+<img src="docs/back.jpg" width="300" alt="The back of the watch: a round chart of the last seven days, with the floor and ceiling as rings">
+
+</div>
+
+## Why
+
+CITIC Bank publishes its current buy price and nothing else: no history and no alerts. If you're waiting for a good moment to change money, that means checking by hand. FX Watch checks every ten minutes, records each new quote, and tells you when the price is worth acting on.
+
+## Features
+
+**On the front**
+- The needle shows where today's price sits between your floor and ceiling, on a dial banded **BUY · HOLD · TOO HIGH**
+- The price is shown on number drums, with the change since yesterday's close and a ticker tape of recent quotes
+- Turn the knob to switch between GBP and USD. Press the crown to wind the watch, which refreshes it
+
+**On the back**
+- Tap the watch to turn it over. The back is a circular chart recorder covering 24 hours, 7, 30 or 90 days
+- Turn the bezel to change the span, shown in a date-style window at twelve
+- Your floor and ceiling appear as rings. When the market is closed, the trace holds the last price until a new quote arrives
+
+**Alerts**
+- Each currency has an optional floor and ceiling, set with number wheels. The dial previews the change before you save
+- An alert fires once when a limit is crossed and repeats every 4 hours while the price stays outside it. It re-arms only after the price comes back inside by more than 0.1%, so a price hovering at a limit doesn't keep alerting
+- If the 10-minute check keeps failing, you're told, and you're told again when it recovers
+
+**Everyday use**
+- Installs to the iPhone home screen or the Mac Dock, and opens offline with the last prices, marked OFFLINE
+- Private: one password per device, and the API returns nothing without it
+- Quiet sounds and haptics for every control. Motion is reduced when the system asks for it
+
+## Design
+
+The whole interface is a single pocket watch: navy, ivory, and one brass case. A few rules hold it together:
+
+- **One light, from the upper left.** Every highlight and shadow on every part agrees with it
+- **Every part is mounted.** Nothing floats on a drop shadow; parts sit in or on the watch
+- **Gold belongs to the watch.** The rest of the page stays in the navy and ivory palette
+- **Mechanical feel comes from behaviour, not ornament.** Drums roll, the bezel clicks round one way, the hand sweeps up from rest. No gears are painted on
+
+The same rules open [`public/style.css`](public/style.css).
 
 ## How it works
 
-One Cloudflare Worker:
+```mermaid
+flowchart LR
+  P["Web app<br/>public/"] -- "/api/*" --> W["Cloudflare Worker<br/>src/worker.js"]
+  W -- "price now" --> C["CITIC rate feed"]
+  T["Cron, every 10 min"] --> W
+  W <--> K[("Workers KV<br/>limits · alert state ·<br/>one record per day")]
+  W -- "alerts" --> G["Telegram"]
+```
 
 | Part | Where |
 |---|---|
-| Web app | `public/`, with one script module per part of the page in `public/js/` (dial, tape, back, settings sheet, shared state, start-up) |
-| API (`/api/rates`, `/api/history`, `/api/settings`, `/api/test`) | `src/worker.js` |
-| Parsing, alert rules, messages | `src/logic.js` |
-| Floors and ceilings (`limits`), alert state and last check (`data`), and price history as one record per Beijing day (`h:YYYY-MM-DD`, expiring after 92 days); the tape and yesterday's close are read from the history | Workers KV (`STORE`) |
-| 10-minute check | Cron trigger in `wrangler.jsonc` |
+| Web app: one ES module per part of the page (dial, tape, back, settings sheet, shared state, start-up) | `public/`, `public/js/` |
+| API: `/api/rates`, `/api/history`, `/api/settings`, `/api/test` | `src/worker.js` |
+| Feed parsing, alert rules, messages (pure functions, unit-tested) | `src/logic.js` |
+| History: one KV record per Beijing day (`h:YYYY-MM-DD`), each expiring after 92 days, so a check reads and writes only today's record | Workers KV |
+| Offline copy: network first, cached copy as fallback | `public/sw.js` |
+
+Written in plain JavaScript, HTML and CSS: no framework, no bundler, no npm dependencies.
 
 ## Develop
 
 ```sh
 echo 'EDIT_PASSWORD=localtest' > .dev.vars
-npm run dev     # http://localhost:8787
-npm test
-npm run check:screens  # with npm run dev running: six screen sizes in headless Chrome
+npm run dev            # http://localhost:8787
+npm test               # unit tests for the logic and the Worker
+npm run check:screens  # with dev running: six screen sizes in headless Chrome
 ```
+
+`check:screens` opens the app at phone and desktop sizes. At each size it checks that the app fits one screen and throws no errors, then turns the watch over, turns the knob, drags a wheel and opens the settings sheet. Screenshots are saved to `screens/`.
 
 ## Deploy
 
 Pushing to `main` deploys through Cloudflare Workers Builds. The Worker name must stay `fx-watch`.
 
-Secrets (Cloudflare dashboard → fx-watch → Settings → Variables and Secrets):
+Set the following secrets in the Cloudflare dashboard (fx-watch → Settings → Variables and Secrets):
 
 | Name | What |
 |---|---|
-| `EDIT_PASSWORD` | Password to open the app (and change floors and ceilings) |
+| `EDIT_PASSWORD` | Password to open the app and change limits |
 | `TELEGRAM_BOT_TOKEN` | From @BotFather |
 | `TELEGRAM_CHAT_ID` | Your chat ID with the bot |
 
@@ -53,3 +100,9 @@ Secrets (Cloudflare dashboard → fx-watch → Settings → Variables and Secret
 
 - **iPhone:** open the site in Safari → Share → Add to Home Screen
 - **Mac:** open the site in Safari → File → Add to Dock
+
+## Notes
+
+Prices come from the public feed behind the rate table on citicbank.com and are for reference only. The price shown in the CITIC app when you trade is final. This project is not affiliated with China CITIC Bank.
+
+Fonts (Cinzel, Cormorant Garamond, Playfair Display, Special Elite) are self-hosted under the SIL Open Font License.

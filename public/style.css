@@ -6,6 +6,11 @@
 @font-face { font-family: 'Playfair Display'; font-weight: 700; font-display: swap; src: url(/fonts/playfair-display-700.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 @font-face { font-family: 'Special Elite'; font-weight: 400; font-display: swap; src: url(/fonts/special-elite.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
+/* The page is one pocket watch, and every part keeps to these rules:
+   - one light, from the upper left, for every highlight and shadow;
+   - every part is mounted in or on the watch, none floats on a shadow;
+   - gold belongs to the watch, the rest stays navy and ivory;
+   - mechanical feel comes from motion, sound and touch, not ornament. */
 :root {
   --navy-deep: #0b151d;
   --brass-light: #d9b06a;

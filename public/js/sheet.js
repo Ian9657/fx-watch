@@ -3,6 +3,7 @@
 // ceiling would sit before saving.
 import { $, SIDES, state, getJSON, Locked, lock, draftLimits, crossed, pressable, sound, haptic } from './shared.js';
 import { render } from './dial.js';
+import { downloadHistory } from './back.js';
 
 // Each wheel is a drum with the ten digits round its rim. Its position is
 // counted in notches and never wraps, so 9 → 0 keeps turning forward; the
@@ -300,6 +301,7 @@ for (const side of SIDES) {
 
 pressable($('sheet-close'));
 pressable($('test'));
+pressable($('export'));
 $('sheet-close').addEventListener('click', closeSheet);
 $('sheet-backdrop').addEventListener('click', closeSheet);
 for (const side of SIDES) {
@@ -320,6 +322,17 @@ $('settings').addEventListener('submit', async e => {
       body: JSON.stringify({ limits: next }),
     }));
     closeSheet();
+  } catch (err) {
+    if (err instanceof Locked) return lock('Enter your password again.');
+    $('form-status').textContent = err.message;
+  }
+});
+
+$('export').addEventListener('click', async () => {
+  $('form-status').textContent = 'Preparing…';
+  try {
+    await downloadHistory();
+    $('form-status').textContent = '';
   } catch (err) {
     if (err instanceof Locked) return lock('Enter your password again.');
     $('form-status').textContent = err.message;

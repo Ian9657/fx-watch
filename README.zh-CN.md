@@ -48,6 +48,7 @@
 - 可安装的 PWA。Service Worker 采用网络优先、缓存兜底；缓存的 API 响应带 `X-Offline` 时间戳，页面据此标注过期数据。
 - 音效由 Web Audio 用滤波噪声实时合成，不含音频文件。触感反馈使用 `navigator.vibrate`，iOS Safari 上通过切换一个隐藏的 `<input type="checkbox" switch>` 实现。
 - 遵循 `prefers-reduced-motion`。
+8601，北京时间）、`unix`，然后每个币种一列。在浏览器里由 `/api/history` 生成。
 
 ## 数据
 

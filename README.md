@@ -48,6 +48,7 @@ CITIC publishes only its current quote: no history, no alerts. A Cron Trigger po
 - Installable PWA. The service worker is network-first with a cache fallback; cached API responses carry an `X-Offline` timestamp so the page can mark stale data.
 - Sounds are synthesised in Web Audio from filtered noise bursts, with no audio files. Haptics use `navigator.vibrate`, and on iOS Safari the toggle of a hidden `<input type="checkbox" switch>`.
 - Honours `prefers-reduced-motion`.
+- The settings sheet exports the full history as CSV: `time` (ISO 8601, Beijing time), `unix`, then one column per currency. Built in the browser from `/api/history`.
 
 ## Data
 

@@ -1,0 +1,4 @@
+# Secrets for the Worker. For local development, copy this file to .dev.vars.
+EDIT_PASSWORD=choose-a-password
+TELEGRAM_BOT_TOKEN=123456789:replace-with-your-bot-token
+TELEGRAM_CHAT_ID=123456789

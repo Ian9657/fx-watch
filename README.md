@@ -109,7 +109,7 @@ flowchart TB
 Requires Node 24.
 
 ```sh
-echo 'EDIT_PASSWORD=localtest' > .dev.vars
+cp .dev.vars.example .dev.vars   # then set EDIT_PASSWORD=localtest
 npm run dev            # wrangler dev, http://localhost:8787
 npm test               # node --test
 npm run check:screens  # needs npm run dev
@@ -119,13 +119,17 @@ At each size, `check:screens` asserts that the layout fits one screen without sc
 
 ## Deployment
 
-Pushing to `main` deploys through Cloudflare Workers Builds. The Worker name must stay `fx-watch`. Secrets, under fx-watch → Settings → Variables and Secrets:
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Ian9657/fx-watch)
+
+The button copies the repository to your GitHub account, creates the KV namespace, and deploys the Worker with its Cron Trigger through Workers Builds, so later pushes to `main` redeploy. It asks for three secrets, listed in [`.dev.vars.example`](.dev.vars.example):
 
 | Name | Purpose |
 |---|---|
 | `EDIT_PASSWORD` | API password |
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
-| `TELEGRAM_CHAT_ID` | Chat to send alerts to |
+| `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) (`/newbot`) |
+| `TELEGRAM_CHAT_ID` | Chat to send alerts to: message the bot, then read `message.chat.id` from `https://api.telegram.org/bot<token>/getUpdates` |
+
+They can be changed later under the Worker's Settings → Variables and Secrets. The Worker is served on `<name>.<subdomain>.workers.dev`; a custom domain can be added under Settings → Domains & Routes.
 
 To install on a device, open the site in Safari, then Share → Add to Home Screen (iPhone) or File → Add to Dock (Mac).
 

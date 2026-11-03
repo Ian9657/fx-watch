@@ -6,5 +6,18 @@
     "dev": "npx wrangler@4 dev",
     "test": "node --test",
     "check:screens": "node scripts/check-screens.mjs"
+  },
+  "cloudflare": {
+    "bindings": {
+      "EDIT_PASSWORD": {
+        "description": "The password the page asks for. Every `/api/*` request must carry it. Pick a long one, e.g. from `openssl rand -base64 18`."
+      },
+      "TELEGRAM_BOT_TOKEN": {
+        "description": "Create a bot by messaging [@BotFather](https://t.me/BotFather) on Telegram and sending `/newbot`. It replies with the token."
+      },
+      "TELEGRAM_CHAT_ID": {
+        "description": "Send your bot any message, then open `https://api.telegram.org/bot<token>/getUpdates`. The number at `message.chat.id` is your chat ID."
+      }
+    }
   }
 }

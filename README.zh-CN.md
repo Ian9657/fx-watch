@@ -109,7 +109,7 @@ flowchart TB
 需要 Node 24。
 
 ```sh
-echo 'EDIT_PASSWORD=localtest' > .dev.vars
+cp .dev.vars.example .dev.vars   # 然后改为 EDIT_PASSWORD=localtest
 npm run dev            # wrangler dev，http://localhost:8787
 npm test               # node --test
 npm run check:screens  # 需先运行 npm run dev
@@ -119,13 +119,17 @@ npm run check:screens  # 需先运行 npm run dev
 
 ## 部署
 
-推送到 `main` 后由 Cloudflare Workers Builds 自动部署，Worker 名称必须保持为 `fx-watch`。密钥在 fx-watch → Settings → Variables and Secrets 中设置：
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Ian9657/fx-watch)
+
+按钮会把仓库复制到你的 GitHub 账号，创建 KV 命名空间，并通过 Workers Builds 部署 Worker 及其 Cron Trigger，之后推送到 `main` 会自动重新部署。部署时需要填写三个密钥，见 [`.dev.vars.example`](.dev.vars.example)：
 
 | 名称 | 用途 |
 |---|---|
 | `EDIT_PASSWORD` | API 密码 |
-| `TELEGRAM_BOT_TOKEN` | 从 @BotFather 获取的机器人 token |
-| `TELEGRAM_CHAT_ID` | 接收提醒的会话 |
+| `TELEGRAM_BOT_TOKEN` | 机器人 token：在 Telegram 上给 [@BotFather](https://t.me/BotFather) 发送 `/newbot` 获取 |
+| `TELEGRAM_CHAT_ID` | 接收提醒的会话：先给机器人发一条消息，再打开 `https://api.telegram.org/bot<token>/getUpdates`，读取 `message.chat.id` |
+
+之后可在 Worker 的 Settings → Variables and Secrets 中修改。Worker 默认地址为 `<name>.<subdomain>.workers.dev`，可在 Settings → Domains & Routes 中添加自定义域名。
 
 安装到设备：用 Safari 打开网站，iPhone 上选 分享 → 添加到主屏幕，Mac 上选 文件 → 添加到程序坞。
 

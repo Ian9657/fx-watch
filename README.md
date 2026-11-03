@@ -45,7 +45,7 @@ CITIC publishes only its current quote: no history, no alerts. A Cron Trigger po
 - Per side, the alert state records the limit it fired for. It sends once on crossing, repeats every 4 h while the price stays outside, and re-arms only once the price is back inside by more than 0.1% (hysteresis).
 - A failed send is retried on the next check. After 3 failed checks in a row a "checks failing" message goes out, then a "recovered" one.
 
-<p align="center"><img src="docs/sheet.jpg" width="300" alt="The settings sheet open under the watch: floor 8.9300 and ceiling 8.9800 on number wheels, each with an ON switch, and a Save button"></p>
+<p align="center"><img src="docs/sheet.jpg" width="300" alt="The settings sheet open under the watch: a GBP currency wheel and a KNOB ON switch in its title, floor 8.9300 and ceiling 8.9800 on number wheels, each with an ON switch, and a Save button"></p>
 
 **Client**
 - Installable PWA. The service worker is network-first with a cache fallback; cached API responses carry an `X-Offline` timestamp so the page can mark stale data.

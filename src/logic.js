@@ -7,7 +7,7 @@ export const PAIRS = ['USD', 'GBP', 'EUR', 'JPY', 'HKD', 'AUD', 'CAD', 'SGD'];
 export const unit = p => p === 'JPY' ? 100 : 1;
 
 // CITIC Bank's code for every currency in its rate feed, in the order
-// history records them. GBP and USD (PAIRS) are the ones shown and alerted on.
+// history records them. The eight in PAIRS are the ones shown and alerted on.
 export const CURRENCIES = {
   USD: '014001', GBP: '012001', EUR: '051001', JPY: '027001', HKD: '013001',
   CAD: '028001', CHF: '015001', NZD: '062001', AUD: '029001', SGD: '018001',

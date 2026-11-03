@@ -7,7 +7,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-A single-user web app that tracks China CITIC Bank's GBP and USD buy prices, records their history, and sends Telegram alerts at a floor and a ceiling.
+A single-user web app that tracks China CITIC Bank's buy prices for eight currencies, records their history, and sends Telegram alerts at a floor and a ceiling.
 
 [fx.etarc.net](https://fx.etarc.net) · Cloudflare Workers + KV · vanilla JS, no dependencies, no build step
 
@@ -20,14 +20,16 @@ A single-user web app that tracks China CITIC Bank's GBP and USD buy prices, rec
 > [!NOTE]
 > Prices come from the public feed behind the rate table on citicbank.com and are for reference only. The price in the CITIC app at the time of trade is final.
 
-CITIC publishes only its current quote: no history, no alerts. A Cron Trigger polls the feed every 10 minutes, the Worker stores each new quote in KV, and the page reads the history back from there.
+CITIC publishes only its current quote: no history, no alerts. A Cron Trigger polls the feed every 10 minutes, the Worker stores each new quote in KV (all 20 currencies in the feed, buy and sell), and the page reads the history back from there.
 
 ## Features
 
 **Dial (front)**
 - Needle position is the price mapped onto a scale built from the floor and ceiling: floor at 0.3, ceiling at 0.7, clamped to [0.02, 0.98]. Bands read BUY / HOLD / TOO HIGH.
 - Price on number drums, change against the previous day's last quote, and a tape of the last 12 recorded quotes.
-- The knob switches GBP / USD. The crown refreshes; the page also refreshes every 30 s while visible, and on focus or resume.
+- Eight currencies: USD, GBP, EUR, JPY, HKD, AUD, CAD, SGD. JPY is per 100 yen, as CITIC quotes it.
+- The knob carries one to four of them, each with a lamp showing its band. A tap moves to the next stop; a drag turns it stop by stop, with a click at each.
+- The crown refreshes; the page also refreshes every 30 s while visible, and on focus or resume.
 
 **Chart (back)**
 - Polar chart in SVG: one turn per span (24 h, 7 d, 30 d or 90 d), time clockwise from the top, price outward on the dial's scale.
@@ -39,6 +41,7 @@ CITIC publishes only its current quote: no history, no alerts. A Cron Trigger po
 
 **Alerts**
 - Each currency has an optional floor and ceiling, set on digit wheels and previewed on the dial before saving.
+- A wheel of currency codes in the sheet's title picks the currency, and a KNOB switch beside it puts that currency on the knob or takes it off. Alerts don't depend on the knob.
 - Per side, the alert state records the limit it fired for. It sends once on crossing, repeats every 4 h while the price stays outside, and re-arms only once the price is back inside by more than 0.1% (hysteresis).
 - A failed send is retried on the next check. After 3 failed checks in a row a "checks failing" message goes out, then a "recovered" one.
 
@@ -48,7 +51,7 @@ CITIC publishes only its current quote: no history, no alerts. A Cron Trigger po
 - Installable PWA. The service worker is network-first with a cache fallback; cached API responses carry an `X-Offline` timestamp so the page can mark stale data.
 - Sounds are synthesised in Web Audio from filtered noise bursts, with no audio files. Haptics use `navigator.vibrate`, and on iOS Safari the toggle of a hidden `<input type="checkbox" switch>`.
 - Honours `prefers-reduced-motion`.
-- The settings sheet exports the full history as CSV: `time` (ISO 8601, Beijing time), `unix`, then one column per currency. Built in the browser from `/api/history`.
+- The settings sheet exports the full history as CSV: `time` (ISO 8601, Beijing time), `unix`, then one column per currency, per unit (JPY per 100). Built in the browser from `/api/history`.
 
 ## Data
 
@@ -56,11 +59,15 @@ Workers KV, binding `STORE`:
 
 | Key | Contents | Written by |
 |---|---|---|
-| `limits` | `{ GBP: { floor, ceiling }, USD: … }` | `PUT /api/settings` only |
+| `limits` | `{ USD: { floor, ceiling }, GBP: …, … }` for the eight currencies | `PUT /api/settings` only |
+| `knob` | the knob's currencies in order, e.g. `["GBP", "USD"]` | `PUT /api/settings` only |
 | `data` | alert state, last check, failure count | the 10-minute check only |
-| `h:YYYY-MM-DD` | `[t, GBP, USD]` rows for one Beijing day, ≤144 rows (~4 KB), TTL 92 days | the 10-minute check |
+| `h:YYYY-MM-DD` | one Beijing day: `{ codes, rows }`, a row `[t, …sell, …buy]` per new quote for all 20 currencies, as quoted (per 100 units). ≤144 rows (~50 KB), TTL 92 days | the 10-minute check |
+| `r:YYYY-MM-DD` | the last row of each hour of a finished day, TTL 92 days | the 10-minute check, once a day |
 
-`limits` and `data` each have one writer, so a save and a check can't overwrite each other. A check reads and writes only today's record, and skips the write when the quote time hasn't changed.
+Each record has one writer, so a save and a check can't overwrite each other. A check reads and writes only today's record, and skips the write when the quote time hasn't changed.
+
+Parsing 90 full days would take more than the ~10 ms of CPU a free-plan request gets. The chart reads the last 8 days in full and hourly rollups before that (3.7 ms). The CSV reads full days through `/api/history?from=&to=`, 15 days per request (2.2 ms each).
 
 ## Security
 

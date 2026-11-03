@@ -6,7 +6,7 @@
 const CACHE = 'fx-watch-2';
 const SHELL = [
   '/', '/style.css', '/manifest.webmanifest', '/icon-180.png',
-  '/js/app.js', '/js/shared.js', '/js/dial.js', '/js/tape.js', '/js/back.js', '/js/sheet.js', '/js/demo.js',
+  '/js/app.js', '/js/shared.js', '/js/dial.js', '/js/tape.js', '/js/back.js', '/js/sheet.js', '/js/demo.js', '/js/lock.js', '/js/spring.js',
   '/fonts/cinzel-700.woff2', '/fonts/cormorant-garamond.woff2', '/fonts/playfair-display-700.woff2', '/fonts/special-elite.woff2',
 ];
 

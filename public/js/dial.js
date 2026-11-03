@@ -184,12 +184,19 @@ let needleWoken = false, latest = 0;
 function turnNeedle(deg) {
   const needle = $('needle');
   latest = deg;
+  if (state.lidShut) return void (needle.style.transform = 'rotate(-90deg)'); // at rest until it's seen
   if (needleWoken) return void (needle.style.transform = `rotate(${deg}deg)`);
   needleWoken = true;
   needle.style.transform = 'rotate(-90deg)';
   requestAnimationFrame(() => requestAnimationFrame(() => {
     setTimeout(() => { needle.style.transform = `rotate(${latest}deg)`; }, 150);
   }));
+}
+
+// The lid has opened: wake the hand, without redrawing the page mid-swing.
+export function wakeNeedle() {
+  state.lidShut = false;
+  turnNeedle(latest);
 }
 
 export function render() {

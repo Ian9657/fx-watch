@@ -34,6 +34,7 @@ export const state = {
   failing: null,   // { since, count, error } while the 10-minute check keeps failing
   alertError: null, // { time, error } if the last alert couldn't be sent
   offlineAt: null, // when the answers on show were saved, if they're the offline copy (sw.js)
+  lidShut: false,  // the lid is still over the dial, just after unlocking (js/lock.js)
   winding: false,  // a refresh you asked for (crown or status line) is under way
   pair: PAIRS.includes(store.get('pair')) ? store.get('pair') : 'GBP', // which currency the dial reads
   draft: null,     // { floor: { on, text }, ceiling: { on, text } } for the currency in the sheet
@@ -68,8 +69,12 @@ export function showError(message) {
 }
 
 export function lock(message = '') {
-  $('app').hidden = true;
-  $('refresh').hidden = true;
+  // The watch stays in its place, shut; the form takes the place of the rest.
+  $('app').hidden = false;
+  $('app').classList.add('locked');
+  $('gauge').inert = true;
+  $('lid').hidden = false;
+  $('refresh').hidden = false; // unseen, but keeping its space, as the rest does
   $('lock').hidden = false;
   $('lock-status').textContent = message;
   $('password').focus();
@@ -78,6 +83,8 @@ export function lock(message = '') {
 export function unlock() {
   $('lock').hidden = true;
   $('app').hidden = false;
+  $('app').classList.remove('locked');
+  $('gauge').inert = false;
   $('refresh').hidden = false;
   $('crown-hint').hidden = !!store.get('wound');
 }

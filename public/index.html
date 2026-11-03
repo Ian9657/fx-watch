@@ -32,10 +32,9 @@
     <p id="error" class="error" hidden></p>
 
     <!-- Shown until the password is entered on this device. -->
-    <form id="lock" class="lock" hidden>
-      <p class="caps">PRIVATE INSTRUMENT</p>
-      <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" required>
+    <form id="lock" class="lock" aria-label="Private instrument" hidden>
+      <label for="password" class="sr-only">Password</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Password" required>
       <button type="submit" class="btn press">UNLOCK</button>
       <p id="lock-status" class="note" role="status"></p>
     </form>
@@ -186,6 +185,7 @@
             </g>
             <g class="bezel" id="bezel"></g>
           </svg>
+          <div class="lid" id="lid" hidden></div>
         </div>
         <span class="turn-hint press" id="turn-hint" hidden>TAP THE WATCH TO TURN IT OVER</span>
         <span class="sr-only" id="back-live" aria-live="polite"></span>

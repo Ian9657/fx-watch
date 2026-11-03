@@ -66,6 +66,7 @@ body {
 }
 
 main {
+  position: relative;
   max-width: 440px;
   min-height: 100vh;
   min-height: 100dvh; /* the visible height, below Safari's address bar */
@@ -162,10 +163,78 @@ button { cursor: pointer; }
 .btn:active, .btn.pressed { background: linear-gradient(#161d23, #1d262e); }
 
 /* Lock screen */
-.lock { display: flex; flex-direction: column; gap: 12px; margin-top: 40px; text-align: center; }
+.lock {
+  /* Over the part of the page below the watch (placed by js/app.js). */
+  position: absolute;
+  z-index: 2;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
 .lock[hidden] { display: none; }
-.lock .caps { color: var(--brass-light); }
-.lock label { color: var(--muted); }
+.lock .caps { font-size: var(--caps-xl); letter-spacing: var(--track-title); color: #d8cfb8; }
+.lock input { border-color: #2c3640; background: #0b1014; box-shadow: inset 0 2px 3px #000, 0 1px 0 rgba(255,255,255,.06); }
+.lock input::placeholder { color: #6b6556; font-size: var(--text-m); }
+.lock input:focus-visible { outline: 1px solid #6b7680; outline-offset: 2px; }
+.lock .note { position: absolute; left: 0; right: 0; top: -24px; }
+#app.locked > :not(.gauge), #app.locked .turn-hint, #app.locked .crown-hint { visibility: hidden; }
+#app.locked .gauge { transition: none; } /* so the form can be placed from where it rests */
+.lock.leaving { pointer-events: none; animation: fade-out .2s ease-out both; }
+/* Nothing's been drawn yet: hold the lines the readout will take. */
+#app.locked .readout p { min-height: 1.35em; }
+#app.arriving > :not(.gauge), #app.arriving .turn-hint, #app.arriving .crown-hint { animation: fade-in .28s ease-out both; }
+.gauge.refused { animation: refused .3s cubic-bezier(.36, .07, .19, .97); }
+@keyframes refused { 20%, 60% { translate: -5px 0; } 40%, 80% { translate: 4px 0; } }
+/* The lid, a flat plate inside the watch's own rim, lit from the upper left.
+   */
+.lid {
+  position: absolute;
+  inset: 7.8%;
+  z-index: 5;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(145deg, #bb9050, #93692f 50%, #6a4a20);
+  box-shadow: 0 1px 0 rgba(255,240,205,.25), 0 6px 14px rgba(0,0,0,.4);
+  transform: translateZ(1px);
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+}
+.lid[hidden] { display: none; }
+/* The spun metal's highlights: two narrow fans, opposite each other. */
+.lid-sheen, .lid-flash { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; will-change: transform, opacity; }
+.lid-sheen { background: conic-gradient(from 278deg,
+  rgba(40,24,4,.34) 0deg, rgba(255,226,160,.28) 12deg, rgba(255,250,232,.95) 22deg, rgba(255,226,160,.28) 32deg, rgba(40,24,4,.3) 58deg, rgba(30,18,2,.46) 130deg,
+  rgba(40,24,4,.34) 180deg, rgba(255,226,160,.2) 192deg, rgba(255,246,222,.68) 202deg, rgba(255,226,160,.2) 212deg, rgba(40,24,4,.3) 238deg, rgba(30,18,2,.46) 310deg, rgba(40,24,4,.34) 360deg); }
+/* The plate's cut edge, lit like the rim: bright where it faces the light, dark
+   where it doesn't. A hard line, as machined metal has. */
+.lid-bevel {
+  position: absolute; inset: 0; border-radius: 50%; pointer-events: none; will-change: transform;
+  background: conic-gradient(from 270deg, #fff3cf, #f0d595 8%, #8a6330 22%, #4a3212 38%, #7a5728 48%, #e6c98c 56%, #fff3cf 62%, #a67a3c 72%, #4a3212 86%, #b98a4b 95%, #fff3cf);
+  -webkit-mask-image: radial-gradient(circle closest-side, transparent 95.4%, #000 95.9%);
+  mask-image: radial-gradient(circle closest-side, transparent 95.4%, #000 95.9%);
+}
+.lid-flash { opacity: 0; background: radial-gradient(circle at 34% 26%, rgba(255,250,232,.55), rgba(255,246,222,.1) 34%, rgba(255,246,222,0) 56%); }
+/* Under the plate as it rises: the metal's side, and its shadow. */
+.lid-side, .lid-cast { position: absolute; inset: 7.8%; border-radius: 50%; pointer-events: none; transform-origin: 50% 50%; will-change: transform, opacity; }
+.lid-side { z-index: 5; background: conic-gradient(from 210deg, #f3dca3, #b48546 12%, #5a3f1a 25%, #c99a55 38%, #f0d595 50%, #a67a3c 63%, #4a3212 75%, #b98a4b 88%, #f3dca3); box-shadow: inset 0 -1px 0 rgba(255,240,205,.35); }
+.lid-cast { z-index: 4; transform-origin: 50% 50%; background: rgba(8,5,0,.55); box-shadow: 0 0 26px 10px rgba(8,5,0,.55); }
+/* The lid's shadow on the dial, lifting as it opens. */
+.lid-shade { position: absolute; inset: 7.8%; z-index: 4; border-radius: 50%; background: rgba(14,9,2,.55); pointer-events: none; will-change: opacity; }
+.lid svg { position: relative; display: block; width: 100%; height: 100%; }
+.lid > svg:not(.lid-face) { position: absolute; inset: 0; }
+.lid .lid-face { position: absolute; inset: 0; will-change: transform; }
+.lid-chamfer-line { fill: none; stroke: rgba(40,24,4,.6); stroke-width: .6; }
+.lid-spun circle { fill: none; stroke: rgba(40,24,4,.2); stroke-width: .45; }
+.lid-words { font: 700 11px 'Cinzel', serif; letter-spacing: 4px; text-anchor: middle; fill: #1f1505; }
+.lid-words.lit { fill: rgba(255,236,190,.62); }
+.lid-shackle { fill: none; stroke: #1f1505; stroke-width: 4.2; }
+.lid-body { fill: #1f1505; }
+.lid-hole { fill: #a47a3c; }
+.lid-mark.lit .lid-shackle { stroke: rgba(255,236,190,.62); }
+.lid-mark.lit .lid-body { fill: rgba(255,236,190,.62); }
 
 input {
   width: 100%;
@@ -706,5 +775,8 @@ footer.small { margin-top: 10px; text-align: center; font-size: var(--caps-xs); 
   .sheet-backdrop.closing { animation: none; }
   .tape-run, .tape-run .fresh, .turn-hint { animation: none; }
   .case { transition: none; }
+  .gauge.refused { animation: none; }
+  .lock.leaving { animation: none; }
+  #app.arriving > :not(.gauge), #app.arriving .turn-hint, #app.arriving .crown-hint { animation: none; }
   .drum.settle { transition: none; }
 }

@@ -2,7 +2,8 @@
 // password lock. The parts of the page live in their own modules.
 import { $, DEMO, store, state, getJSON, Locked, showError, lock, unlock, pressable, feel, sound, haptic } from './shared.js';
 import { sampleData } from './demo.js';
-import { buildFace, render, renderStatus } from './dial.js';
+import { buildLock, openLid, refuse } from './lock.js';
+import { buildFace, render, renderStatus, wakeNeedle } from './dial.js';
 import { loadHistory, turned } from './back.js';
 import './sheet.js';
 
@@ -41,14 +42,31 @@ async function refreshAll() {
     // History (up to ~90 KB) is only fetched while the back is showing.
     await Promise.all([...(DEMO ? [loadDemo()] : [loadSettings(), loadRates()]), turned() ? loadHistory() : null]);
     const wasLocked = !$('lock').hidden;
+    state.lidShut = wasLocked;
     unlock();
     showError('');
     render();
-    if (wasLocked) fit();
+    if (wasLocked) {
+      fit(); // the readout has its real lines now
+      // The form fades as the rest of the page comes in.
+      const form = $('lock');
+      form.hidden = false;
+      form.classList.add('leaving');
+      $('app').classList.add('arriving');
+      setTimeout(() => {
+        form.hidden = true;
+        form.classList.remove('leaving');
+        $('app').classList.remove('arriving');
+      }, 300);
+      openLid(wakeNeedle);
+    }
   } catch (err) {
     if (err instanceof Locked) {
+      const tried = !$('lock').hidden;
       store.remove('password');
       lock('Wrong password.');
+      fit();
+      if (tried) refuse();
     } else {
       showError(`Couldn't load: ${err.message}`);
     }
@@ -116,10 +134,19 @@ function fit() {
   // Give the watch half of any spare height; take all of any shortfall.
   const byHeight = (h - (over > 0 ? over : over / 2)) / h;
   const k = Math.max(0.6, Math.min(1.2, byWidth, byHeight));
-  if (Math.abs(k - 1) < 0.005) return;
+  if (Math.abs(k - 1) < 0.005) return placeLock();
   gauge.style.setProperty('--fit', k.toFixed(3));
   gauge.style.marginBottom = `${((k - 1) * h).toFixed(1)}px`; // match the space to the new size
   root.classList.toggle('tall', main.scrollHeight > innerHeight + 1);
+  placeLock();
+}
+// While locked, the form sits halfway down the space below the watch.
+function placeLock() {
+  const form = $('lock');
+  if (form.hidden) return;
+  const top = $('case').getBoundingClientRect().bottom, bottom = document.querySelector('footer').getBoundingClientRect().top;
+  const origin = document.querySelector('main').getBoundingClientRect().top;
+  form.style.top = `${Math.round(top - origin + Math.max(8, (bottom - top - form.offsetHeight) / 2))}px`;
 }
 addEventListener('resize', fit);
 document.fonts?.ready.then(fit);
@@ -134,6 +161,7 @@ if (navigator.serviceWorker) {
 }
 
 buildFace();
+if (!DEMO) buildLock();
 if (DEMO) {
   document.title = 'FX Watch demo';
   document.querySelector('.masthead .small').textContent = 'DEMO · SAMPLE DATA';

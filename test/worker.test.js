@@ -61,7 +61,7 @@ test('a check alerts once per crossing and records the quote once', async () => 
   assert.equal(store.json('data').alerted.GBP.floor, 8.92);
   const day = store.json('h:2026-10-27');
   assert.equal(day.rows.length, 1);
-  assert.deepEqual(pairRows(day), [[day.rows[0][0], 8.91, 6.69]]);
+  assert.deepEqual(pairRows(day, ['GBP', 'USD']), [[day.rows[0][0], 8.91, 6.69]]);
 
   // Same quote again: no new alert and no write to the day's history.
   store.writes.length = 0;
@@ -144,11 +144,32 @@ test('the chart gets the last week in full and hourly before; the CSV every quot
     [`h:${old}`]: dayOf([at(old), at(old) + 600, at(old) + 1200]), // no rollup kept
     [`h:${days[11]}`]: [[at(days[11]), 8.8, 6.6]], // the old layout
   });
-  const chart = (await (await get(store, '/api/history')).json()).history;
+  const { pairs, history: chart } = await (await get(store, '/api/history')).json();
   assert.deepEqual(chart.map(r => r[0]), [at(days[11]), at(old) + 1200, at(recent), at(recent) + 600]);
-  assert.deepEqual(chart[0], [at(days[11]), 8.8, 6.6]);
+  assert.deepEqual([chart[0][1 + pairs.indexOf('GBP')], chart[0][1 + pairs.indexOf('USD')]], [8.8, 6.6]);
   const full = (await (await get(store, `/api/history?from=${days[11]}&to=${days[0]}`)).json()).history;
   assert.equal(full.length, 6);
   assert.equal((await get(store, `/api/history?from=${days[11]}T&to=${days[0]}`)).status, 400);
   assert.equal((await get(store, `/api/history?from=${daysBack(days[0], 17)[16]}&to=${days[0]}`)).status, 400);
+});
+
+test('saving one currency keeps the others', async () => {
+  const store = fakeKV({ limits: { ...limits, EUR: { floor: 7.4, ceiling: null } } });
+  const put = body => worker.fetch(new Request('https://x/api/settings', { method: 'PUT', headers: { Authorization: 'Bearer pw' }, body: JSON.stringify(body) }), env(store));
+  assert.equal((await put({ limits: { GBP: { floor: 8.9, ceiling: 9 } } })).status, 200);
+  const saved = store.json('limits');
+  assert.deepEqual(saved.GBP, { floor: 8.9, ceiling: 9 });
+  assert.deepEqual(saved.EUR, { floor: 7.4, ceiling: null });
+  assert.deepEqual(saved.JPY, { floor: null, ceiling: null });
+  assert.equal((await put({ limits: { JPY: { floor: 4.3, ceiling: 4.2 } } })).status, 400);
+});
+
+test('a check carries on when a currency is missing, and fails when all are', async () => {
+  const store = fakeKV({ limits });
+  const usdOnly = 'cb(' + JSON.stringify({ content: { resultList: [{ quotePriceDate: '2026年10月27日', quotePriceTime: '20:00:00', curCode: '014001', cstexcSellPrice: '669.00', cstexcBuyPrice: '666.00' }] } }) + ')';
+  network(() => usdOnly);
+  assert.equal(await run(env(store)), undefined);
+  assert.deepEqual(Object.keys(store.json('data').lastCheck.rates), ['USD']);
+  network(() => 'cb({"content":{"resultList":[]}})');
+  assert.match((await run(env(store))).message, /No CITIC price/);
 });

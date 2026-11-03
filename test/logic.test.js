@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, CODES, TAPE_LENGTH, toRow, appendRow, normalizeDay, pairRows, hourly, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage, failingMessage, recoveredMessage } from '../src/logic.js';
+import { parseCitic, CODES, PAIRS, fillLimits, TAPE_LENGTH, toRow, appendRow, normalizeDay, pairRows, hourly, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage, failingMessage, recoveredMessage } from '../src/logic.js';
 
 const none = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
 const limits = (gbp, usd = {}) => ({
@@ -81,11 +81,12 @@ test('a new limit alerts straight away, with no reset of the alert state', () =>
 
 test('migrates settings saved before ceilings existed', () => {
   const data = migrate({ floors: { GBP: 8.9, USD: null }, alerted: { GBP: true, USD: false }, lastCheck: 1 });
-  assert.deepEqual(data.limits, limits({ floor: 8.9 }));
+  assert.deepEqual(data.limits, fillLimits({ GBP: { floor: 8.9 } }));
+  assert.deepEqual(Object.keys(data.limits), PAIRS);
   assert.deepEqual(data.alerted.GBP, { floor: true, ceiling: false });
   assert.equal(data.lastCheck, 1);
   assert.equal('floors' in data, false);
-  assert.deepEqual(migrate({}).limits, limits({}));
+  assert.deepEqual(migrate({}).limits, fillLimits());
   // The limit an alert was for survives a round trip.
   assert.deepEqual(migrate({ alerted: { GBP: { floor: 8.92, ceiling: false } } }).alerted.GBP, { floor: 8.92, ceiling: false });
 });
@@ -128,8 +129,9 @@ test('validates limits', () => {
 
 test('test message does not claim a limit was crossed', () => {
   const msg = testMessage({ GBP: { price: 8.958 }, USD: { price: 6.69 } }, limits({ floor: 8.9, ceiling: 9.1 }));
-  assert.match(msg, /GBP 8\.9580 · USD 6\.6900/);
-  assert.match(msg, /Alerts: GBP below 8\.9000 or above 9\.1000 · USD off/);
+  assert.match(msg, /\nGBP 8\.9580 · below 8\.9000 or above 9\.1000\n/);
+  assert.match(msg, /\nUSD 6\.6900 · off\n/);
+  assert.doesNotMatch(msg, /EUR/); // not in the feed this time
   assert.doesNotMatch(msg, /your (floor|ceiling)/);
 });
 
@@ -145,17 +147,19 @@ test('each new quote is added to the day once, with every currency as quoted', (
   assert.equal(row[1 + n + CODES.indexOf('JPY')], 4.1952);
   assert.equal(row[1 + CODES.indexOf('EUR')], null); // not in this feed
   // The page's rows: per-unit sell prices, with no float noise.
-  assert.deepEqual(pairRows({ codes: CODES, rows }), [[1, 8.9341, 6.6879], [2, 8.9341, 6.6879]]);
+  assert.deepEqual(pairRows({ codes: CODES, rows }, ['GBP', 'USD']), [[1, 8.9341, 6.6879], [2, 8.9341, 6.6879]]);
+  // JPY in its own unit, per 100 as quoted.
+  assert.deepEqual(pairRows({ codes: CODES, rows }, ['JPY']), [[1, 4.2364], [2, 4.2364]]);
 });
 
 test('reads day records kept before every currency was', () => {
   const old = normalizeDay([[1, 8.9341, 6.6879], [2, 8.91, null]]);
   assert.deepEqual(old.codes, CODES);
   assert.equal(old.rows[0][1 + CODES.indexOf('GBP')], 893.41);
-  assert.deepEqual(pairRows(old), [[1, 8.9341, 6.6879], [2, 8.91, null]]);
+  assert.deepEqual(pairRows(old, ['GBP', 'USD']), [[1, 8.9341, 6.6879], [2, 8.91, null]]);
   // Kept under another list of codes: laid out again by code.
   const other = normalizeDay({ codes: ['GBP', 'XYZ'], rows: [[3, 900, 1, 890, 2]] });
-  assert.deepEqual(pairRows(other), [[3, 9, null]]);
+  assert.deepEqual(pairRows(other, ['GBP', 'USD']), [[3, 9, null]]);
   assert.equal(other.rows[0][1 + CODES.length + CODES.indexOf('GBP')], 890);
   assert.deepEqual(normalizeDay(null).rows, []);
 });
@@ -167,10 +171,10 @@ test('a rollup keeps the last quote of each hour', () => {
 });
 
 test('ticker tape is the newest quotes first', () => {
-  const rows = Array.from({ length: 30 }, (_, t) => [t, 8 + t / 100, 7]);
+  const rows = Array.from({ length: 30 }, (_, t) => [t, ...PAIRS.map(p => p === 'GBP' ? 8 + t / 100 : 7)]);
   const tape = tapeFrom(rows);
   assert.equal(tape.length, TAPE_LENGTH);
-  assert.deepEqual(tape[0], { t: 29, GBP: 8.29, USD: 7 });
+  assert.deepEqual([tape[0].t, tape[0].GBP, tape[0].USD], [29, 8.29, 7]);
   assert.equal(tape.at(-1).t, 18);
 });
 
@@ -187,4 +191,22 @@ test('failure and recovery messages say how long alerts were off', () => {
   assert.match(msg, /alerts are paused/);
   assert.match(msg, /CITIC returned 503/);
   assert.match(recoveredMessage({ count: 5 }), /after 5 failed checks \(about 50 minutes\)/);
+});
+
+test('a currency missing from one check keeps its alert state', () => {
+  const first = evaluate({ GBP: 8.8, USD: 6.7 }, limits({ floor: 8.9 }), none);
+  const gap = evaluate({ USD: 6.7 }, limits({ floor: 8.9 }), first.alerted, first.sentAt);
+  assert.equal(gap.alerts.length, 0);
+  assert.equal(gap.alerted.GBP.floor, 8.9);
+  // Back, still below: no second alert, as if it had never gone.
+  assert.equal(evaluate({ GBP: 8.8, USD: 6.7 }, limits({ floor: 8.9 }), gap.alerted, gap.sentAt).alerts.length, 0);
+});
+
+test('yen is quoted and alerted per 100', () => {
+  const feed = 'cb(' + JSON.stringify({ content: { resultList: [
+    { quotePriceDate: '2026年11月03日', quotePriceTime: '21:00:00', curCode: '027001', cstexcBuyPrice: '4.1952', cstexcSellPrice: '4.2364' },
+  ] } }) + ')';
+  assert.equal(parseCitic(feed).JPY.price, 4.2364);
+  assert.match(alertMessage({ pair: 'JPY', side: 'floor', rate: 4.2, limit: 4.25 }), /100 JPY = 4\.2000 CNY/);
+  assert.match(alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }), /: 1 GBP = 8\.8000 CNY/);
 });

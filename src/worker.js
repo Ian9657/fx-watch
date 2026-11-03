@@ -1,4 +1,4 @@
-import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, FULL_DAYS, DAY_TTL, dayKey, rollupKey, toRow, normalizeDay, pairRows, hourly, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
+import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, FULL_DAYS, DAY_TTL, dayKey, rollupKey, toRow, normalizeDay, pairRows, hourly, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, fillLimits, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
 
 // Two records, each with one writer, so neither can overwrite the other:
 // 'limits' is written only when you save settings, and 'data' (alert state
@@ -18,7 +18,7 @@ async function load(env) {
     const sent = old.alerted[p][side];
     return [side, sent === true ? old.limits[p][side] ?? false : sent];
   }))]));
-  return { lastCheck: old.lastCheck ?? null, alerted, limits: limits || old.limits, failing: data?.failing ?? null, alertError: data?.alertError ?? null, sentAt: data?.sentAt ?? {} };
+  return { lastCheck: old.lastCheck ?? null, alerted, limits: fillLimits(limits || old.limits), failing: data?.failing ?? null, alertError: data?.alertError ?? null, sentAt: data?.sentAt ?? {} };
 }
 
 // The same feed that powers the rate table on citicbank.com.
@@ -122,7 +122,7 @@ async function check(env) {
     const quotes = await fetchCitic();
     await record(env, quotes);
     await rollUp(env);
-    const rates = Object.fromEntries(PAIRS.map(p => [p, quotes[p].price]));
+    const rates = Object.fromEntries(PAIRS.filter(p => quotes[p]).map(p => [p, quotes[p].price]));
     const { alerts, alerted, sentAt } = evaluate(rates, data.limits, data.alerted, data.sentAt);
     let alertError = alerts.length ? null : data.alertError;
     for (const alert of alerts) {
@@ -162,7 +162,7 @@ async function api(request, env, path) {
     const since = Number(new URL(request.url).searchParams.get('since'));
     const before = since > 0 ? since : Date.parse(`${beijingDay(Date.now())}T00:00:00+08:00`) / 1000;
     const [quotes, prev] = await Promise.all([fetchCitic(), previousClose(env, before)]);
-    return json(Object.fromEntries(PAIRS.map((p, i) => [p, { ...quotes[p], previousClose: prev?.[i + 1] ?? null }])));
+    return json(Object.fromEntries(PAIRS.flatMap((p, i) => quotes[p] ? [[p, { ...quotes[p], previousClose: prev?.[i + 1] ?? null }]] : [])));
   }
 
   if (path === '/api/history') {
@@ -178,7 +178,7 @@ async function api(request, env, path) {
       reads = daysBack(beijingDay(Date.now()), HISTORY_DAYS + 1).map((day, i) => i < FULL_DAYS ? readDay(env, day) : readRollup(env, day));
     }
     const history = (await Promise.all(reads)).reverse().flatMap(rec => pairRows(rec));
-    return json({ history });
+    return json({ pairs: PAIRS, history }); // rows are [t, ...one price per pair]
   }
 
   if (path === '/api/settings' && request.method === 'GET') {
@@ -190,11 +190,13 @@ async function api(request, env, path) {
 
   if (path === '/api/settings' && request.method === 'PUT') {
     const body = await request.json().catch(() => ({}));
-    const limits = {};
+    // A currency left out of the body keeps the limits it has.
+    const limits = {}, { limits: current } = await load(env);
     for (const p of PAIRS) {
+      if (body.limits?.[p] === undefined) { limits[p] = current[p]; continue; }
       limits[p] = {};
       for (const side of SIDES) {
-        const v = body.limits?.[p]?.[side] ?? null;
+        const v = body.limits[p]?.[side] ?? null;
         if (!validLimit(v)) return json({ error: `Invalid ${side} for ${p}` }, 400);
         limits[p][side] = v;
       }

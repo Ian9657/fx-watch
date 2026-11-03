@@ -1,6 +1,10 @@
 // Pure helpers shared by the worker and tests. No I/O here.
 
-export const PAIRS = ['GBP', 'USD'];
+// The currencies the app watches: limits, alerts, the page. JPY is quoted
+// per 100 units, as CITIC does, so it keeps four places on the drums like
+// the rest; the others per unit.
+export const PAIRS = ['USD', 'GBP', 'EUR', 'JPY', 'HKD', 'AUD', 'CAD', 'SGD'];
+export const unit = p => p === 'JPY' ? 100 : 1;
 
 // CITIC Bank's code for every currency in its rate feed, in the order
 // history records them. GBP and USD (PAIRS) are the ones shown and alerted on.
@@ -18,7 +22,8 @@ const BEIJING = 8 * 3600 * 1000;
 // CITIC rate feed (JSONP) → { GBP: { price, sell, buy, time }, ... } for
 // every currency in it. sell is the customer buy price (客户购汇价) and buy
 // the customer sell price (客户结汇价), both as quoted: CNY per 100 units.
-// price is sell per 1 unit, for GBP and USD, which must be present.
+// price is sell in the currency's own unit (see unit). A currency missing
+// from the feed is left out; a feed with none of PAIRS is an error.
 export function parseCitic(text) {
   const json = JSON.parse(text.slice(text.indexOf('(') + 1, text.lastIndexOf(')')));
   const rows = json?.content?.resultList;
@@ -27,21 +32,20 @@ export function parseCitic(text) {
   for (const code of CODES) {
     const row = rows.find(r => r.curCode === CURRENCIES[code]);
     const sell = Number(row?.cstexcSellPrice), buy = Number(row?.cstexcBuyPrice);
-    if (!Number.isFinite(sell) || sell <= 0) {
-      if (PAIRS.includes(code)) throw new Error(`No CITIC price for ${code}`);
-      continue;
-    }
+    if (!Number.isFinite(sell) || sell <= 0) continue;
     const [y, m, d] = row.quotePriceDate.match(/\d+/g).map(Number);
     const [hh, mm, ss] = row.quotePriceTime.split(':').map(Number);
     const time = (Date.UTC(y, m - 1, d, hh, mm, ss) - BEIJING) / 1000;
-    quotes[code] = { price: perUnit(sell), sell, buy: Number.isFinite(buy) && buy > 0 ? buy : null, time };
+    quotes[code] = { price: price(code, sell), sell, buy: Number.isFinite(buy) && buy > 0 ? buy : null, time };
   }
+  if (!PAIRS.some(p => quotes[p])) throw new Error('No CITIC price for any currency watched');
   return quotes;
 }
 
-// The feed gives CNY per 100 units; dividing leaves float noise
-// (893.41 / 100 = 8.934099999999999), so round to the 4 places quoted.
-export const perUnit = v => +(v / 100).toFixed(4);
+// A price as quoted (CNY per 100) in the currency's own unit. Dividing
+// leaves float noise (893.41 / 100 = 8.934099999999999), so round to the 4
+// places shown.
+export const price = (code, quoted) => +(quoted * unit(code) / 100).toFixed(4);
 
 // Price history is kept one record per Beijing day,
 //   { codes: [...CODES], rows: [[t, ...sell per code, ...buy per code]] },
@@ -68,18 +72,18 @@ export const toRow = (t, quotes) => [t, ...CODES.map(c => quotes[c]?.sell ?? nul
 export function normalizeDay(value) {
   if (!value) return { codes: CODES, rows: [] };
   const old = Array.isArray(value)
-    ? { codes: PAIRS, rows: value.map(([t, ...prices]) => [t, ...prices.map(v => v == null ? null : +(v * 100).toFixed(4)), ...prices.map(() => null)]) }
+    ? { codes: ['GBP', 'USD'], rows: value.map(([t, ...prices]) => [t, ...prices.map(v => v == null ? null : +(v * 100).toFixed(4)), ...prices.map(() => null)]) }
     : value;
   if (old.codes.join() === CODES.join()) return old;
   const n = old.codes.length, at = CODES.map(c => old.codes.indexOf(c));
   return { codes: CODES, rows: old.rows.map(r => [r[0], ...at.map(i => i < 0 ? null : r[1 + i]), ...at.map(i => i < 0 ? null : r[1 + n + i])]) };
 }
 
-// Rows of [t, ...per-unit sell prices of `pairs`]: the shape the page, the
-// tape and yesterday's close use.
+// Rows of [t, ...sell prices of `pairs` in their own units]: the shape the
+// page, the tape and yesterday's close use.
 export function pairRows(record, pairs = PAIRS) {
   const at = pairs.map(p => 1 + record.codes.indexOf(p));
-  return record.rows.map(r => [r[0], ...at.map(i => i < 1 || r[i] == null ? null : perUnit(r[i]))]);
+  return record.rows.map(r => [r[0], ...at.map((i, k) => i < 1 || r[i] == null ? null : price(pairs[k], r[i]))]);
 }
 
 // The last row of each hour.
@@ -123,8 +127,11 @@ export function validLimit(value) {
 // Settings saved before ceilings existed: { floors: { GBP: n } } and
 // alerted: { GBP: bool } → { limits: { GBP: { floor, ceiling } } } and
 // alerted: { GBP: { floor, ceiling } }.
+// Limits for every currency watched, none set for those added since.
+export const fillLimits = (limits = {}) => Object.fromEntries(PAIRS.map(p => [p, { floor: null, ceiling: null, ...limits[p] }]));
+
 export function migrate(data) {
-  const limits = data.limits || Object.fromEntries(PAIRS.map(p => [p, { floor: data.floors?.[p] ?? null, ceiling: null }]));
+  const limits = fillLimits(data.limits || Object.fromEntries(Object.entries(data.floors || {}).map(([p, floor]) => [p, { floor, ceiling: null }])));
   const alerted = Object.fromEntries(PAIRS.map(p => {
     const a = data.alerted?.[p];
     // A side holds the limit it alerted for (a number), true from older
@@ -164,14 +171,16 @@ export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now()) 
   const next = {}, nextAt = {};
   const alerts = [];
   for (const pair of PAIRS) {
-    next[pair] = { ...alerted[pair] };
+    next[pair] = { floor: false, ceiling: false, ...alerted[pair] };
     nextAt[pair] = { floor: null, ceiling: null, ...sentAt[pair] };
     const rate = rates[pair];
+    // No quote this time (missing from the feed): keep the state as it was.
+    if (!Number.isFinite(rate)) continue;
     for (const side of SIDES) {
       const limit = limits[pair]?.[side];
       const sent = alerted[pair]?.[side];
       const at = sentAt[pair]?.[side] ?? null;
-      if (!Number.isFinite(rate) || limit == null || (!crossed(side, rate, limit) && rearmed(side, rate, limit))) {
+      if (limit == null || (!crossed(side, rate, limit) && rearmed(side, rate, limit))) {
         next[pair][side] = false;
         nextAt[pair][side] = null;
       } else if (crossed(side, rate, limit)) {
@@ -195,7 +204,7 @@ export function alertMessage({ pair, side, rate, limit, repeat }) {
   const name = side === 'floor' ? 'Floor' : 'Ceiling';
   const where = side === 'floor' ? 'below' : 'above';
   return `${pair} is ${repeat ? 'still ' : ''}${where} your ${side}\n` +
-    `CITIC buy price: 1 ${pair} = ${rate.toFixed(4)} CNY\n` +
+    `CITIC buy price: ${unit(pair)} ${pair} = ${rate.toFixed(4)} CNY\n` +
     `${name}: ${limit.toFixed(4)}\n` +
     (repeat ? `A reminder every ${REPEAT_MS / 3600_000} hours while it stays ${where}.\n` : '') +
     `Re-arms once back ${side === 'floor' ? 'above' : 'below'} ${rearmAt(side, limit).toFixed(4)}.\n` +
@@ -211,10 +220,9 @@ function describeLimits({ floor, ceiling } = {}) {
 
 // Confirms delivery only; says nothing about whether a limit was crossed.
 export function testMessage(quotes, limits) {
-  const list = f => PAIRS.map(p => `${p} ${f(p)}`).join(' · ');
+  const lines = PAIRS.filter(p => quotes[p]).map(p => `${unit(p) === 1 ? '' : `${unit(p)} `}${p} ${quotes[p].price.toFixed(4)} · ${describeLimits(limits[p])}`);
   return `FX Watch test: notifications are working.\n` +
-    `CITIC buy price now: ${list(p => quotes[p].price.toFixed(4))}\n` +
-    `Alerts: ${list(p => describeLimits(limits[p]))}\n` +
+    `CITIC buy price now, in CNY, and alerts:\n${lines.join('\n')}\n` +
     `You'll get a message when a price crosses one of these.`;
 }
 

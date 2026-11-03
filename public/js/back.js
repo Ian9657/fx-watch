@@ -1,6 +1,6 @@
 // The back of the watch: a round chart of the recorded price, the bezel
 // that sets its time span, and turning the watch over.
-import { $, PAIRS, store, state, getJSON, Locked, limitsFor, position, sound, haptic } from './shared.js';
+import { $, store, state, getJSON, Locked, limitsFor, position, sound, haptic } from './shared.js';
 
 // ---- Chart ---------------------------------------------------------------
 // A circular chart recorder: the paper turns once per span, the pen sits at
@@ -9,7 +9,8 @@ import { $, PAIRS, store, state, getJSON, Locked, limitsFor, position, sound, ha
 // are rings in the dial's band colours. A quote stands until the next one,
 // so through a quiet spell (a weekend) the trace holds its price round the
 // paper, then steps to the new quote.
-let history = [];  // [t, GBP, USD] rows the Worker has recorded, oldest first
+let history = [];  // [t, ...one price per pair] rows the Worker has recorded, oldest first
+let pairs = [];    // the currencies in those rows, in order
 let historyAt = 0; // when history was last loaded (epoch ms)
 const SPANS = [1, 7, 30, 90]; // days, shown one at a time in the bezel's window
 let days = SPANS.includes(Number(store.get('chartDays'))) ? Number(store.get('chartDays')) : 7;
@@ -22,7 +23,7 @@ const spanWords = d => d === 1 ? '24 hours' : `${d} days`;
 export async function loadHistory() {
   if (Date.now() - historyAt < 10 * 60_000) return; // it only grows every 10 minutes
   try {
-    ({ history } = await getJSON('/api/history'));
+    ({ history, pairs } = await getJSON('/api/history'));
     historyAt = Date.now();
   } catch (err) {
     if (err instanceof Locked) throw err; // otherwise keep the last chart
@@ -37,12 +38,15 @@ export async function downloadHistory() {
   const beijing = t => new Date((t + 8 * HOUR) * 1000).toISOString().slice(0, 19) + '+08:00';
   const day = t => beijing(t).slice(0, 10);
   const now = Date.now() / 1000, rows = [];
+  let columns = [];
   for (let back = 0; back < 91; back += 15) {
     const to = day(now - back * DAY), from = day(now - Math.min(back + 14, 90) * DAY);
-    rows.unshift(...(await getJSON(`/api/history?from=${from}&to=${to}`)).history);
+    const part = await getJSON(`/api/history?from=${from}&to=${to}`);
+    rows.unshift(...part.history);
+    columns = part.pairs;
   }
   if (!rows.length) throw new Error('No history recorded yet.');
-  const csv = [['time', 'unix', ...PAIRS], ...rows.map(([t, ...prices]) => [beijing(t), t, ...prices.map(v => v ?? '')])]
+  const csv = [['time', 'unix', ...columns], ...rows.map(([t, ...prices]) => [beijing(t), t, ...prices.map(v => v ?? '')])]
     .map(row => row.join(',')).join('\n') + '\n';
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
@@ -74,11 +78,11 @@ const annulus = (r0, r1) => `M${C},${C - r1}a${r1},${r1} 0 1 0 0.01,0ZM${C},${C 
 
 export function drawChart() {
   const { pair } = state;
-  const col = PAIRS.indexOf(pair) + 1;
+  const col = pairs.indexOf(pair) + 1;
   const t1 = Date.now() / 1000, t0 = t1 - days * DAY;
   // Time runs clockwise from 10° past the top round to the pen at the top.
   const A = t => 10 + 350 * (t - t0) / (t1 - t0);
-  const priced = history.filter(r => r[col] != null);
+  const priced = col ? history.filter(r => r[col] != null) : [];
   let rows = priced.filter(r => r[0] >= t0);
   // At most about one point per 0.4°; 90 days holds ~13,000 quotes.
   const every = Math.ceil(rows.length / 900);

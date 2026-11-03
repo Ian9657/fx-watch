@@ -1,4 +1,4 @@
-import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, FULL_DAYS, DAY_TTL, dayKey, rollupKey, toRow, normalizeDay, pairRows, hourly, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, validKnob, KNOB, DEMO_PAIRS, demoPayload, migrate, fillLimits, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
+import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, FULL_DAYS, DAY_TTL, dayKey, rollupKey, toRow, normalizeDay, pairRows, hourly, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, validKnob, KNOB, migrate, fillLimits, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
 
 // The currencies on the knob ('knob'), written only when you save settings.
 async function readKnob(env) {
@@ -160,32 +160,14 @@ async function check(env) {
   }
 }
 
-// The public demo's data, from recorded quotes only, kept at the edge for
-// five minutes so visitors cost no more KV reads than one does.
-const DEMO_CACHE_S = 300;
-async function demo(request, env) {
-  // One key, whatever the query string, so a query can't get round the cache.
-  const key = new Request(new URL('/api/demo', request.url));
-  const cache = globalThis.caches?.default, kept = await cache?.match(key);
-  if (kept) return kept;
-  const today = beijingDay(Date.now());
-  const days = await Promise.all(daysBack(today, FULL_DAYS).map(day => readDay(env, day)));
-  const rows = days.reverse().flatMap(rec => pairRows(rec, DEMO_PAIRS));
-  const midnight = Date.parse(`${today}T00:00:00+08:00`) / 1000;
-  const response = Response.json(demoPayload(rows, midnight), { headers: { 'Cache-Control': `public, max-age=${DEMO_CACHE_S}` } });
-  if (rows.length) await cache?.put(key, response.clone());
-  return response;
-}
-
 async function api(request, env, path) {
-  // The app is private: every API call but the demo's needs the password. Requests
+  // The whole app is private: every API call needs the password. Requests
   // are counted per address before the password is checked, so guessing it
   // is slowed to API_LIMIT a minute (the page itself makes about ten).
   if (env.API_LIMIT) {
     const { success } = await env.API_LIMIT.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
     if (!success) return json({ error: 'Too many requests. Try again in a minute.' }, 429);
   }
-  if (path === '/api/demo' && request.method === 'GET') return demo(request, env);
   if (!(await authorized(request, env))) return json({ error: 'Locked' }, 401);
 
   if (path === '/api/rates') {

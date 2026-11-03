@@ -183,6 +183,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 
 /* Ticker tape: a strip of paper running between two slots */
 .tape { position: relative; height: 34px; margin: 12px -18px -6px; }
+.tape.linked { cursor: pointer; }
 .tape::before {
   content: '';
   position: absolute;

@@ -1,5 +1,6 @@
 // The back of the watch: a round chart of the recorded price, the bezel
 // that sets its time span, and turning the watch over.
+import { sampleData } from './demo.js';
 import { $, DEMO, store, state, getJSON, Locked, limitsFor, position, sound, haptic } from './shared.js';
 
 // ---- Chart ---------------------------------------------------------------
@@ -23,7 +24,7 @@ const spanWords = d => d === 1 ? '24 hours' : `${d} days`;
 export async function loadHistory() {
   if (Date.now() - historyAt < 10 * 60_000) return; // it only grows every 10 minutes
   try {
-    ({ history, pairs } = await getJSON(DEMO ? '/api/demo' : '/api/history'));
+    ({ history, pairs } = DEMO ? sampleData() : await getJSON('/api/history'));
     historyAt = Date.now();
   } catch (err) {
     if (err instanceof Locked) throw err; // otherwise keep the last chart

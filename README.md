@@ -71,9 +71,9 @@ Parsing 90 full days would take more than the ~10 ms of CPU a free-plan request 
 
 ## Security
 
-- `/demo` and `/api/demo` are public. They serve recorded GBP and USD prices for the last 8 days with sample limits, cached for 5 minutes, and nothing of the saved limits or alert state. The demo has no settings sheet, alerts or CSV, and its bezel stops at 24 h and 7 d.
-- Every other `/api/*` route needs `Authorization: Bearer <password>`; the Worker compares SHA-256 digests with `crypto.subtle.timingSafeEqual`.
-- Before the password is checked (and for the demo too), a [rate limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) allows 60 API requests a minute per address (counted per Cloudflare location), which slows guessing. The page makes about ten a minute.
+- `/demo` is public: the same page on GBP and USD prices generated in the browser, with no API requests, so it exposes nothing recorded or saved. It has no settings sheet, alerts or CSV, and its bezel stops at 24 h and 7 d.
+- Every `/api/*` route needs `Authorization: Bearer <password>`; the Worker compares SHA-256 digests with `crypto.subtle.timingSafeEqual`.
+- Before the password is checked, a [rate limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) allows 60 API requests a minute per address (counted per Cloudflare location), which slows guessing. The page makes about ten a minute.
 - The password is kept per device in `localStorage`. A 401 clears it and shows the lock.
 - Outbound requests go only to the CITIC feed and the Telegram Bot API. No third-party scripts, fonts or analytics; fonts are self-hosted.
 

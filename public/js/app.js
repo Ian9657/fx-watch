@@ -1,13 +1,14 @@
 // Start-up: load prices and settings, keep them fresh, and handle the
 // password lock. The parts of the page live in their own modules.
 import { $, DEMO, store, state, getJSON, Locked, showError, lock, unlock, pressable, feel, sound, haptic } from './shared.js';
+import { sampleData } from './demo.js';
 import { buildFace, render, renderStatus } from './dial.js';
 import { loadHistory, turned } from './back.js';
 import './sheet.js';
 
-async function loadDemo() {
-  const { rates, limits, knob, tape } = await getJSON('/api/demo');
-  Object.assign(state, { rates, limits, knob, tape, lastCheck: Date.now(), lastGood: Date.now(), feedError: null });
+function loadDemo() {
+  const { rates, limits, knob } = sampleData();
+  Object.assign(state, { rates, limits, knob, lastCheck: Date.now(), lastGood: Date.now(), feedError: null });
   if (!knob.includes(state.pair)) state.pair = knob[0];
 }
 
@@ -135,7 +136,8 @@ if (navigator.serviceWorker) {
 buildFace();
 if (DEMO) {
   document.title = 'FX Watch demo';
-  document.querySelector('.masthead .small').textContent = 'DEMO · SAMPLE LIMITS';
+  document.querySelector('.masthead .small').textContent = 'DEMO · SAMPLE DATA';
+  document.querySelector('footer').textContent = 'SAMPLE PRICES · NOT A QUOTE';
   $('toggle-settings').textContent = 'View on GitHub';
   $('toggle-settings').removeAttribute('aria-haspopup');
 }

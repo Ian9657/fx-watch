@@ -44,8 +44,8 @@ export function renderStatus() {
     text = `TELEGRAM FAILED AT ${time(new Date(alertError.time))}`;
   }
   if (DEMO) {
-    level = feedError || !quoteTime ? 'error' : 'ok';
-    text = quoteTime && !feedError ? `DEMO · RECORDED ${time(new Date(quoteTime))}` : 'DEMO · NO DATA';
+    level = 'ok';
+    text = 'DEMO · SAMPLE DATA';
   }
   if (state.winding) text = 'WINDING…';
   $('refresh').className = `status ${level}${state.winding ? ' winding' : ''}`;
@@ -237,7 +237,7 @@ export function render() {
       const pct = ((r.price - r.previousClose) / r.previousClose) * 100;
       parts.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% today`);
     }
-    parts.push(`CITIC quoted ${time(new Date(r.time * 1000))}`);
+    if (!DEMO) parts.push(`CITIC quoted ${time(new Date(r.time * 1000))}`);
     $('note').textContent = parts.join(' · ');
     $('gauge').setAttribute('aria-label', `${r.price.toFixed(4)} CNY per ${pair}, ${$('zone').textContent.replaceAll('·', '').trim()}`);
   }

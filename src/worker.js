@@ -1,4 +1,10 @@
-import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, FULL_DAYS, DAY_TTL, dayKey, rollupKey, toRow, normalizeDay, pairRows, hourly, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, migrate, fillLimits, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
+import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, FULL_DAYS, DAY_TTL, dayKey, rollupKey, toRow, normalizeDay, pairRows, hourly, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, validKnob, KNOB, migrate, fillLimits, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
+
+// The currencies on the knob ('knob'), written only when you save settings.
+async function readKnob(env) {
+  const knob = await env.STORE.get('knob', 'json');
+  return validKnob(knob) ? knob : KNOB;
+}
 
 // Two records, each with one writer, so neither can overwrite the other:
 // 'limits' is written only when you save settings, and 'data' (alert state
@@ -182,14 +188,15 @@ async function api(request, env, path) {
   }
 
   if (path === '/api/settings' && request.method === 'GET') {
-    const [{ limits, lastCheck, alerted, failing, alertError }, rows] = await Promise.all([load(env), recentRows(env, 12)]);
+    const [{ limits, lastCheck, alerted, failing, alertError }, rows, knob] = await Promise.all([load(env), recentRows(env, 12), readKnob(env)]);
     // Alert state too, so the page can say which alerts have fired and
     // when they re-arm, and whether checks or sends are failing.
-    return json({ limits, lastCheck, tape: tapeFrom(rows), alerted, rearm: REARM, failing, alertError });
+    return json({ limits, knob, lastCheck, tape: tapeFrom(rows), alerted, rearm: REARM, failing, alertError });
   }
 
   if (path === '/api/settings' && request.method === 'PUT') {
     const body = await request.json().catch(() => ({}));
+    if (body.knob !== undefined && !validKnob(body.knob)) return json({ error: 'The knob takes one to four of the currencies' }, 400);
     // A currency left out of the body keeps the limits it has.
     const limits = {}, { limits: current } = await load(env);
     for (const p of PAIRS) {
@@ -208,7 +215,8 @@ async function api(request, env, path) {
     // A changed limit can alert straight away: the alert state records the
     // limit each alert was for, so it needn't be touched here.
     await env.STORE.put('limits', JSON.stringify(limits));
-    return json({ limits });
+    if (body.knob !== undefined) await env.STORE.put('knob', JSON.stringify(body.knob));
+    return json({ limits, knob: body.knob ?? await readKnob(env) });
   }
 
   if (path === '/api/test' && request.method === 'POST') {

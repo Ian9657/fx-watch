@@ -191,11 +191,11 @@
         <span class="sr-only" id="back-live" aria-live="polite"></span>
       </section>
 
-      <!-- Each lamp shows its currency's zone, so the other one is visible without switching. -->
+      <!-- A lamp for each currency on the knob shows its zone, so the others are visible without switching. -->
       <div class="selector">
-        <button class="pick" data-pair="GBP" aria-pressed="true"><span class="lamp-dot" id="lamp-GBP"></span><span class="caps">GBP</span></button>
+        <span class="picks" id="picks-left"></span>
         <button class="knob" id="knob" aria-label="Switch currency"><span class="knob-cap"><span class="knob-mark"></span></span></button>
-        <button class="pick" data-pair="USD" aria-pressed="false"><span class="lamp-dot" id="lamp-USD"></span><span class="caps">USD</span></button>
+        <span class="picks" id="picks-right"></span>
       </div>
 
       <div class="readout">
@@ -217,8 +217,9 @@
     <form id="settings" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
       <span class="sheet-grip" aria-hidden="true"></span>
       <div class="sheet-head">
-        <h2 id="sheet-title" class="press">SET GBP LIMITS</h2>
+        <h2 id="sheet-title" class="press"><span class="code-wheel" id="sheet-pair" tabindex="0" role="spinbutton" aria-label="Currency"></span> LIMITS</h2>
         <span class="sheet-hint press" id="sheet-now"></span>
+        <button type="button" class="toggle toggle-knob press" id="toggle-knob" aria-pressed="true" aria-label="On the knob">KNOB ON</button>
         <button type="button" class="sheet-x" id="sheet-close" aria-label="Close"></button>
       </div>
       <div class="wheel-row" id="row-floor">

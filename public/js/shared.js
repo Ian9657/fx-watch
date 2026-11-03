@@ -1,7 +1,12 @@
 // Small helpers and the state every part of the page reads.
 
 export const $ = id => document.getElementById(id);
-export const PAIRS = ['GBP', 'USD'];
+// The currencies the Worker quotes and alerts on (src/logic.js). The knob
+// carries one to four of them, chosen in the settings sheet.
+export const PAIRS = ['USD', 'GBP', 'EUR', 'JPY', 'HKD', 'AUD', 'CAD', 'SGD'];
+export const KNOB_MAX = 4;
+export const unit = p => p === 'JPY' ? 100 : 1; // CITIC quotes yen per 100
+export const per = p => `${unit(p) === 1 ? '' : `${unit(p)} `}${p}`;
 export const SIDES = ['floor', 'ceiling'];
 
 export const store = {
@@ -12,7 +17,8 @@ export const store = {
 
 export const state = {
   rates: {},
-  limits: { GBP: { floor: null, ceiling: null }, USD: { floor: null, ceiling: null } },
+  limits: Object.fromEntries(PAIRS.map(p => [p, { floor: null, ceiling: null }])),
+  knob: ['GBP', 'USD'], // the currencies on the knob, in the order it turns through them
   lastCheck: null, // when the 10-minute alert check last ran (epoch ms)
   tape: [],        // quotes the alert check has recorded, newest first
   lastGood: null,  // when this page last loaded prices successfully
@@ -24,8 +30,10 @@ export const state = {
   alertError: null, // { time, error } if the last alert couldn't be sent
   offlineAt: null, // when the answers on show were saved, if they're the offline copy (sw.js)
   winding: false,  // a refresh you asked for (crown or status line) is under way
-  pair: store.get('pair') === 'USD' ? 'USD' : 'GBP', // which currency the dial reads
-  draft: null,     // { floor: { on, text }, ceiling: { on, text } } while the sheet is open
+  pair: PAIRS.includes(store.get('pair')) ? store.get('pair') : 'GBP', // which currency the dial reads
+  draft: null,     // { floor: { on, text }, ceiling: { on, text } } for the currency in the sheet
+  drafts: null,    // every currency's draft opened in the sheet, by currency
+  knobDraft: null, // the knob's currencies as the sheet has them
 };
 
 export const time = (date, seconds = false) => date.toLocaleTimeString('en-GB', {
@@ -69,8 +77,7 @@ export function unlock() {
   $('crown-hint').hidden = !!store.get('wound');
 }
 
-export function draftLimits() {
-  const { draft } = state;
+export function draftLimits(draft = state.draft) {
   return Object.fromEntries(SIDES.map(side => [side, draft[side].on ? Number(draft[side].text) : null]));
 }
 export const crossed = ({ floor, ceiling }) => floor != null && ceiling != null && floor >= ceiling;

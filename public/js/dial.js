@@ -1,6 +1,6 @@
 // The front of the watch: the dial, the digit window, the status line and
 // the currency knob.
-import { $, PAIRS, store, state, time, limitsFor, span, position, pressable, sound, haptic } from './shared.js';
+import { $, store, state, time, per, limitsFor, span, position, pressable, sound, haptic } from './shared.js';
 import { drawTape } from './tape.js';
 import { drawChart, turned } from './back.js';
 
@@ -190,15 +190,17 @@ function turnNeedle(deg) {
 
 export function render() {
   const { rates, feedError, pair } = state;
-  for (const p of PAIRS) {
-    // Lamps track every currency, so the one not on the dial still shows its zone.
+  buildSelector();
+  for (const p of knobList()) {
+    // Every lamp shows its currency's zone, so the others are visible without switching.
     const zone = rates[p] && !feedError ? zoneOf(rates[p].price, limitsFor(p)) : '';
-    $(`lamp-${p}`).className = `lamp-dot ${zone}`;
-    document.querySelector(`.pick[data-pair="${p}"]`).setAttribute('aria-pressed', String(p === pair));
-    document.querySelector(`.pick[data-pair="${p}"]`).setAttribute('aria-label', `${p}${zone ? `, ${zone === 'high' ? 'too high' : zone}` : ''}`);
+    const pick = document.querySelector(`.pick[data-pair="${p}"]`);
+    pick.querySelector('.lamp-dot').className = `lamp-dot ${zone}`;
+    pick.setAttribute('aria-pressed', String(p === pair));
+    pick.setAttribute('aria-label', `${p}${zone ? `, ${zone === 'high' ? 'too high' : zone}` : ''}`);
   }
-  $('knob').classList.toggle('usd', pair === 'USD');
-  $('pair-label').textContent = `CNY PER ${pair}`;
+  setMark();
+  $('pair-label').textContent = `CNY PER ${per(pair)}`;
 
   const r = rates[pair];
   const l = limitsFor(pair);
@@ -247,15 +249,38 @@ function selectPair(next) {
   render();
 }
 
-document.querySelectorAll('.pick').forEach(b => {
-  pressable(b);
-  b.addEventListener('click', () => selectPair(b.dataset.pair));
-});
-// The knob: tap it to switch, or turn it. Turned, its mark follows the
-// finger across, and the currency changes with a click as the mark passes
-// the top, the detent between the two; let go and it settles at its stop.
+// The knob is a selector with a stop for each of its currencies (one to
+// four), a lamp for each beside it: the first half on the left, the rest on
+// the right, the knob always in the middle. Tap it for the next stop, or
+// turn it: its mark follows the finger across and the currency changes with
+// a click at each stop; let go and it settles on the stop.
+const STOPS = { 1: [-48], 2: [-48, 48], 3: [-66, -30, 48], 4: [-66, -30, 30, 66] };
 const knob = $('knob'), mark = knob.querySelector('.knob-mark');
-const STOP = 48; // degrees either side of the top
+const knobList = () => state.knobDraft ?? state.knob;
+const stops = () => STOPS[knobList().length];
+let built = '';
+function buildSelector() {
+  const list = knobList();
+  if (list.join() === built) return;
+  built = list.join();
+  const pick = p => {
+    const b = Object.assign(document.createElement('button'), { className: 'pick' });
+    b.dataset.pair = p;
+    b.innerHTML = `<span class="lamp-dot"></span><span class="caps">${p}</span>`;
+    pressable(b);
+    b.addEventListener('click', () => selectPair(p));
+    return b;
+  };
+  const left = Math.ceil(list.length / 2);
+  $('picks-left').replaceChildren(...list.slice(0, left).map(pick));
+  $('picks-right').replaceChildren(...list.slice(left).map(pick));
+}
+// Off the knob (a currency opened in the sheet), the mark rests at the top.
+function setMark() {
+  const i = knobList().indexOf(state.pair);
+  knob.style.setProperty('--stop', `${i < 0 ? 0 : stops()[i]}deg`);
+}
+
 function detent(next) {
   if (next === state.pair) return;
   haptic(6);
@@ -266,28 +291,33 @@ pressable(knob);
 let turn = null, turnedByDrag = false;
 knob.addEventListener('pointerdown', e => {
   knob.setPointerCapture(e.pointerId);
-  turn = { x: e.clientX, from: state.pair === 'USD' ? STOP : -STOP, moved: false };
+  const i = knobList().indexOf(state.pair);
+  turn = { x: e.clientX, from: i < 0 ? 0 : stops()[i], moved: false };
 });
 knob.addEventListener('pointermove', e => {
   if (!turn) return;
   const dx = e.clientX - turn.x;
   if (!turn.moved && Math.abs(dx) < 6) return;
   turn.moved = true;
-  const deg = Math.max(-STOP - 6, Math.min(STOP + 6, turn.from + dx * 1.6));
+  const at = stops();
+  const deg = Math.max(at[0] - 6, Math.min(at.at(-1) + 6, turn.from + dx * 1.6));
   mark.classList.add('following');
   mark.style.transform = `rotate(${deg}deg)`;
-  detent(deg > 0 ? 'USD' : 'GBP');
+  // The nearest stop: the click comes as the mark passes halfway between two.
+  const near = at.reduce((best, a, i) => Math.abs(a - deg) < Math.abs(at[best] - deg) ? i : best, 0);
+  detent(knobList()[near]);
 });
 const letGo = () => {
   if (!turn) return;
   turnedByDrag = turn.moved;
   turn = null;
   mark.classList.remove('following');
-  mark.style.transform = ''; // back to its stop, by the class on the knob
+  mark.style.transform = ''; // back to its stop, set by --stop
 };
 knob.addEventListener('pointerup', letGo);
 knob.addEventListener('pointercancel', letGo);
 knob.addEventListener('click', () => {
   if (turnedByDrag) return void (turnedByDrag = false);
-  detent(state.pair === 'GBP' ? 'USD' : 'GBP');
+  const list = knobList();
+  detent(list[(list.indexOf(state.pair) + 1) % list.length]);
 });

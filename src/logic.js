@@ -120,6 +120,15 @@ export function beijingDay(ms) {
 
 export const SIDES = ['floor', 'ceiling'];
 
+// The currencies on the dial's knob, in the order its stops turn through:
+// one to four of PAIRS, chosen in the settings sheet.
+export const KNOB = ['GBP', 'USD'];
+export const KNOB_MAX = 4;
+export function validKnob(list) {
+  return Array.isArray(list) && list.length >= 1 && list.length <= KNOB_MAX
+    && new Set(list).size === list.length && list.every(p => PAIRS.includes(p));
+}
+
 export function validLimit(value) {
   return value === null || (Number.isFinite(value) && value > 0 && value < 1000);
 }

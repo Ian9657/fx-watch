@@ -1,5 +1,5 @@
 // The ticker tape across the top.
-import { $, PAIRS, state, time } from './shared.js';
+import { $, state, time, per } from './shared.js';
 
 // The tape leads with the live quote when it's newer than the last recorded
 // one, then the recorded quotes, for the currency on the dial. Arrows
@@ -7,12 +7,12 @@ import { $, PAIRS, state, time } from './shared.js';
 let tapeKey = '';
 export function drawTape() {
   const { rates, tape, pair } = state;
-  const live = PAIRS.every(p => rates[p])
-    ? { t: Math.max(...PAIRS.map(p => rates[p].time)), ...Object.fromEntries(PAIRS.map(p => [p, rates[p].price])) }
-    : null;
-  const lines = live && (!tape[0] || live.t > tape[0].t) ? [live, ...tape] : tape;
+  const live = rates[pair] ? { t: rates[pair].time, [pair]: rates[pair].price } : null;
+  // A quote the feed left this currency out of has no line.
+  const recorded = tape.filter(q => q[pair] != null);
+  const lines = live && (!recorded[0] || live.t > recorded[0].t) ? [live, ...recorded] : recorded;
   const arrow = (now, before) => before == null ? '' : now > before ? ' ▲' : now < before ? ' ▼' : ' =';
-  const texts = lines.map((q, i) => `${time(new Date(q.t * 1000))}  ${pair} ${q[pair].toFixed(4)}${arrow(q[pair], lines[i + 1]?.[pair])}   ·`);
+  const texts = lines.map((q, i) => `${time(new Date(q.t * 1000))}  ${per(pair)} ${q[pair].toFixed(4)}${arrow(q[pair], lines[i + 1]?.[pair])}   ·`);
   if (lines.length < 4) texts.push('RECORDING A QUOTE EVERY 10 MINUTES   ·');
   // Each half of the loop must be wider than the screen, or a gap shows.
   while (texts.length < 4) texts.push(...texts);

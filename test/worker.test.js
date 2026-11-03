@@ -164,6 +164,19 @@ test('saving one currency keeps the others', async () => {
   assert.equal((await put({ limits: { JPY: { floor: 4.3, ceiling: 4.2 } } })).status, 400);
 });
 
+test('the knob is saved with the settings, one to four currencies', async () => {
+  const store = fakeKV({ limits });
+  const put = body => worker.fetch(new Request('https://x/api/settings', { method: 'PUT', headers: { Authorization: 'Bearer pw' }, body: JSON.stringify(body) }), env(store));
+  assert.deepEqual((await (await get(store, '/api/settings')).json()).knob, ['GBP', 'USD']);
+  assert.equal((await put({ knob: ['USD', 'JPY', 'EUR'] })).status, 200);
+  assert.deepEqual((await (await get(store, '/api/settings')).json()).knob, ['USD', 'JPY', 'EUR']);
+  for (const knob of [[], ['USD', 'USD'], ['USD', 'GBP', 'EUR', 'JPY', 'HKD'], ['XYZ']]) {
+    assert.equal((await put({ knob })).status, 400);
+  }
+  assert.deepEqual(store.json('knob'), ['USD', 'JPY', 'EUR']);
+  assert.deepEqual(store.json('limits').GBP, limits.GBP); // limits left out stay as they were
+});
+
 test('a check carries on when a currency is missing, and fails when all are', async () => {
   const store = fakeKV({ limits });
   const usdOnly = 'cb(' + JSON.stringify({ content: { resultList: [{ quotePriceDate: '2026年10月27日', quotePriceTime: '20:00:00', curCode: '014001', cstexcSellPrice: '669.00', cstexcBuyPrice: '666.00' }] } }) + ')';

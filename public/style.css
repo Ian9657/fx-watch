@@ -449,8 +449,11 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   background: #c9a160;
 }
 
-/* Currency selector: a steel knob between two status lamps */
-.selector { display: flex; align-items: center; justify-content: center; gap: 22px; }
+/* Currency selector: a steel knob between its status lamps, one to four.
+   The knob stays in the middle whatever the number of lamps. */
+.selector { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 22px; }
+.picks { display: flex; gap: 6px; }
+#picks-left { justify-content: flex-end; }
 .pick {
   display: flex;
   flex-direction: column;
@@ -495,7 +498,6 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 }
 /* Only the mark turns: the light on the cap's grain stays where it is,
    upper left like the dial's, as it would on a real knob. */
-.knob.usd .knob-mark { transform: rotate(48deg); }
 .knob-mark.following { transition: none; }
 .knob { touch-action: none; }
 .knob { transition: transform .1s, box-shadow .1s; }
@@ -510,7 +512,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
   background: #14181c;
   box-shadow: 1px 0 0 rgba(255,255,255,.45);
   transform-origin: 50% 22px; /* the cap's centre */
-  transform: rotate(-48deg);
+  transform: rotate(var(--stop, -48deg));
   transition: transform .55s cubic-bezier(.3, 1.35, .5, 1);
 }
 
@@ -552,7 +554,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .sheet-grip, .sheet-head { touch-action: none; cursor: grab; }
 .sheet.dragging { animation: none; }
 .sheet.settling { transition: transform .22s cubic-bezier(.2, .9, .3, 1); }
-.sheet-head { display: flex; align-items: center; gap: 12px; }
+.sheet-head { display: flex; align-items: center; gap: 8px; }
 .sheet-head h2 { margin-right: auto; }
 .sheet-x { position: relative; width: 36px; height: 36px; margin: -8px -10px -8px 0; padding: 0; border: 0; background: none; color: #8a8372; }
 /* The × is two hairlines, crisp at any size. */
@@ -564,8 +566,31 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .sheet-actions { display: flex; gap: 8px; }
 .btn-small { padding: 7px 12px; border: 0; border-radius: 2px; background: none; color: #a39c8a; font: 700 9px 'Cinzel', serif; letter-spacing: var(--track-mid); box-shadow: inset 0 0 0 1px #2c3640; }
 .btn-small.pressed { background: rgba(255,255,255,.05); color: #e9e1cc; }
-.sheet-head h2 { font-size: 13px; color: #d8cfb8; letter-spacing: var(--track-wide); }
-.sheet-hint { font: 700 10px 'Cinzel', serif; letter-spacing: var(--track-tight); color: #a39c8a; font-variant-numeric: lining-nums; }
+.sheet-head h2 { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #d8cfb8; letter-spacing: var(--track-wide); }
+/* The currency wheel: a short drum of the eight codes, in a window like the number wheels'. */
+.code-wheel {
+  position: relative;
+  width: 52px;
+  height: 26px;
+  overflow: hidden;
+  touch-action: none;
+  cursor: ns-resize;
+  perspective: 200px;
+  background: linear-gradient(#cfc5ad, #f2ead6 30%, #f6efdd 50%, #f2ead6 70%, #c6bba1);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), 0 0 0 3px #0b1014;
+}
+.code-wheel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(rgba(20,14,6,.5), rgba(20,14,6,0) 30%, rgba(20,14,6,0) 70%, rgba(20,14,6,.5));
+}
+.code-wheel:focus-visible { outline: 2px solid var(--brass-light); outline-offset: 4px; }
+.code-wheel .drum { height: 22px; margin-top: -11px; }
+.code-wheel .drum span { line-height: 22px; font: 700 13px 'Cinzel', serif; letter-spacing: var(--track-mid); text-indent: .1em; }
+.toggle.toggle-knob { width: auto; min-height: 30px; padding: 0 8px; font-size: 9px; white-space: nowrap; }
+.sheet-hint { white-space: nowrap; font: 700 10px 'Cinzel', serif; letter-spacing: var(--track-tight); color: #a39c8a; font-variant-numeric: lining-nums; }
 .sheet .note { text-align: left; }
 .sheet .note.bad { color: var(--error); }
 .btn-strong { background: linear-gradient(#2f3c47, #1f2830); color: #e9e1cc; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 0 0 1px #05080b; }

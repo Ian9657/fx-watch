@@ -1,7 +1,8 @@
-// The settings sheet: number wheels for the floor and ceiling. While it's
-// open the dial previews the draft, so you can see where a new floor or
-// ceiling would sit before saving.
-import { $, SIDES, state, getJSON, Locked, lock, draftLimits, crossed, pressable, sound, haptic } from './shared.js';
+// The settings sheet: a wheel of currency codes in the title, number wheels
+// for that currency's floor and ceiling, and whether it's on the knob.
+// While it's open the dial reads the currency in the sheet and previews its
+// draft, so you can see where a new floor or ceiling would sit before saving.
+import { $, PAIRS, SIDES, KNOB_MAX, state, store, getJSON, Locked, lock, draftLimits, crossed, pressable, sound, haptic } from './shared.js';
 import { render } from './dial.js';
 import { downloadHistory } from './back.js';
 
@@ -9,6 +10,7 @@ import { downloadHistory } from './back.js';
 // counted in notches and never wraps, so 9 → 0 keeps turning forward; the
 // digit showing is that count mod 10.
 const wheels = { floor: [], ceiling: [] };
+const shapes = { floor: '', ceiling: '' }; // where the point falls among the wheels
 const NOTCH = 24;                                          // px of drag per notch
 const STEP = 36;                                           // degrees per digit
 const RADIUS = 16 / Math.tan((STEP / 2) * Math.PI / 180); // a 32px face per digit
@@ -17,10 +19,11 @@ const mod10 = n => ((n % 10) + 10) % 10;
 // Turn the drum to a position, either at once (following a finger) or
 // settling onto it with a small overshoot, like a detent dropping home.
 function place(wheel, pos, settle) {
+  const { step = STEP, radius = RADIUS } = wheel;
   wheel.pos = pos;
   wheel.drum.style.transitionDelay = '';
   wheel.drum.classList.toggle('settle', settle);
-  wheel.drum.style.transform = `translateZ(${-RADIUS}px) rotateX(${pos * STEP}deg)`;
+  wheel.drum.style.transform = `translateZ(${-radius}px) rotateX(${pos * step}deg)`;
 }
 
 // The digit showing changed: update the draft (and the dial's preview).
@@ -131,11 +134,9 @@ function makeWheel(side, i, digit) {
 
 // Set a side's wheels to a whole value (e.g. the current price), turning
 // that side on if it was off.
-function setSide(side, text) {
-  const { draft } = state;
-  draft[side].text = text;
-  // Each drum rolls forward to its new digit, the right-hand ones a beat
-  // later, like a counter being reset.
+// Each drum rolls forward to its new digit, the right-hand ones a beat
+// later, like a counter being reset.
+function rollTo(side, text) {
   [...text].forEach((ch, i) => {
     const wheel = wheels[side][i];
     if (!wheel || ch === '.') return;
@@ -145,48 +146,159 @@ function setSide(side, text) {
     wheel.drum.style.transitionDelay = `${i * 40}ms`;
     wheel.el.setAttribute('aria-valuenow', ch);
   });
+}
+
+function setSide(side, text) {
+  const { draft } = state;
+  draft[side].text = text;
+  rollTo(side, text);
   sound('tick');
   if (!draft[side].on) toggleSide(side);
   else sheetChanged();
 }
 
+function syncSide(side) {
+  const { on } = state.draft[side];
+  $(`toggle-${side}`).setAttribute('aria-pressed', String(on));
+  $(`toggle-${side}`).textContent = on ? 'ON' : 'OFF';
+  $(`row-${side}`).classList.toggle('off', !on);
+}
 function toggleSide(side) {
-  const { draft } = state;
-  draft[side].on = !draft[side].on;
-  $(`toggle-${side}`).setAttribute('aria-pressed', String(draft[side].on));
-  $(`toggle-${side}`).textContent = draft[side].on ? 'ON' : 'OFF';
-  $(`row-${side}`).classList.toggle('off', !draft[side].on);
+  state.draft[side].on = !state.draft[side].on;
+  syncSide(side);
   sheetChanged();
 }
 
-function sheetChanged() {
+// The note under the wheels: a draft with floor above ceiling, or why the
+// knob can't take or lose a currency, else what the limits do.
+function sheetChanged(knobProblem = '') {
   const bad = crossed(draftLimits());
-  $('sheet-note').textContent = bad
-    ? 'Floor must be lower than ceiling.'
-    : 'A Telegram message when the price drops below the floor or rises above the ceiling.';
-  $('sheet-note').classList.toggle('bad', bad);
+  $('sheet-note').textContent = bad ? 'Floor must be lower than ceiling.'
+    : knobProblem || 'A Telegram message when the price drops below the floor or rises above the ceiling.';
+  $('sheet-note').classList.toggle('bad', bad || !!knobProblem);
   $('form-status').textContent = '';
   render();
 }
 
-function openSheet() {
-  const { pair, rates, limits } = state;
-  // A limit that's off starts from the current price, ready to dial in.
-  const start = (rates[pair]?.price ?? 1).toFixed(4);
-  const draft = state.draft = Object.fromEntries(SIDES.map(side => {
-    const v = limits[pair][side];
+// On the knob or not. It keeps one to four currencies; one added goes last.
+function syncKnob() {
+  const on = state.knobDraft.includes(state.pair);
+  $('toggle-knob').setAttribute('aria-pressed', String(on));
+  $('toggle-knob').textContent = on ? 'KNOB ON' : 'KNOB OFF';
+}
+function toggleKnob() {
+  const list = state.knobDraft, { pair } = state;
+  if (list.includes(pair) && list.length === 1) return sheetChanged('The knob needs at least one currency.');
+  if (!list.includes(pair) && list.length === KNOB_MAX) return sheetChanged(`The knob has ${KNOB_MAX} stops. Take one off first.`);
+  state.knobDraft = list.includes(pair) ? list.filter(p => p !== pair) : [...list, pair];
+  syncKnob();
+  sheetChanged();
+}
+
+// The currency wheel in the title: the eight codes round a drum, turned
+// like the number wheels (drag, or tap the top or bottom half), but a
+// notch at a time with no fling. Each currency keeps its own draft.
+const CODE_STEP = 360 / PAIRS.length;
+const codeWheel = { step: CODE_STEP, radius: 11 / Math.tan((CODE_STEP / 2) * Math.PI / 180), pos: 0 };
+const codeAt = pos => PAIRS[((Math.round(pos) % PAIRS.length) + PAIRS.length) % PAIRS.length];
+function buildCodeWheel() {
+  const el = $('sheet-pair');
+  const drum = document.createElement('div');
+  drum.className = 'drum';
+  drum.append(...PAIRS.map((p, n) => {
+    const face = Object.assign(document.createElement('span'), { textContent: p });
+    face.style.transform = `rotateX(${-n * CODE_STEP}deg) translateZ(${codeWheel.radius}px)`;
+    return face;
+  }));
+  el.replaceChildren(drum);
+  Object.assign(codeWheel, { el, drum });
+  let startY = 0, startPos = 0, moved = false;
+  const turnTo = pos => {
+    const before = codeAt(codeWheel.pos);
+    place(codeWheel, pos, false);
+    if (codeAt(pos) !== before) { sound('tick'); haptic(4); switchTo(codeAt(pos)); }
+  };
+  el.addEventListener('pointerdown', e => {
+    e.stopPropagation(); // not a pull on the sheet
+    el.setPointerCapture(e.pointerId);
+    startY = e.clientY;
+    startPos = codeWheel.pos;
+    moved = false;
+  });
+  el.addEventListener('pointermove', e => {
+    if (!el.hasPointerCapture(e.pointerId)) return;
+    if (Math.abs(e.clientY - startY) > 6) moved = true;
+    if (moved) turnTo(startPos + (startY - e.clientY) / NOTCH);
+  });
+  el.addEventListener('pointerup', e => {
+    if (moved) return place(codeWheel, Math.round(codeWheel.pos), true);
+    const box = el.getBoundingClientRect();
+    turnTo(Math.round(codeWheel.pos) + (e.clientY < box.top + box.height / 2 ? 1 : -1));
+    place(codeWheel, codeWheel.pos, true);
+  });
+  el.addEventListener('pointercancel', () => place(codeWheel, Math.round(codeWheel.pos), true));
+  el.addEventListener('keydown', e => {
+    const d = { ArrowUp: 1, ArrowDown: -1 }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    turnTo(Math.round(codeWheel.pos) + d);
+    place(codeWheel, codeWheel.pos, true);
+  });
+}
+buildCodeWheel();
+
+// A currency's draft starts from its saved limits; a limit that's off
+// starts from the current price, ready to dial in.
+function draftFor(p) {
+  const { rates, limits } = state;
+  const start = (rates[p]?.price ?? 1).toFixed(4);
+  return Object.fromEntries(SIDES.map(side => {
+    const v = limits[p][side];
     return [side, { on: v != null, text: v != null ? v.toFixed(4) : start }];
   }));
-  $('sheet-title').textContent = `SET ${pair} LIMITS`;
+}
+
+// Show the sheet's currency: its code on the wheel, its price, and its
+// draft on the number wheels, rolled to (or, opening, set at) each digit.
+function showDraft(roll) {
+  const { pair, rates, draft } = state;
+  codeWheel.el.setAttribute('aria-valuetext', pair);
   $('sheet-now').textContent = rates[pair] ? `NOW ${rates[pair].price.toFixed(4)}` : '';
   for (const side of SIDES) {
-    $(`wheels-${side}`).replaceChildren(...[...draft[side].text].map((ch, i) => {
-      if (ch === '.') return Object.assign(document.createElement('span'), { className: 'wheel-dot' });
-      return makeWheel(side, i, ch);
-    }));
-    draft[side].on = !draft[side].on; // toggleSide flips it back and syncs the button
-    toggleSide(side);
+    const { text } = draft[side];
+    const shape = text.replace(/\d/g, '0');
+    if (roll && shapes[side] === shape) {
+      rollTo(side, text);
+    } else {
+      wheels[side] = [];
+      shapes[side] = shape;
+      $(`wheels-${side}`).replaceChildren(...[...text].map((ch, i) => {
+        if (ch === '.') return Object.assign(document.createElement('span'), { className: 'wheel-dot' });
+        return makeWheel(side, i, ch);
+      }));
+    }
+    syncSide(side);
   }
+  syncKnob();
+  sheetChanged();
+}
+
+function switchTo(p) {
+  if (p === state.pair) return;
+  state.pair = p;
+  state.draft = state.drafts[p] ??= draftFor(p);
+  showDraft(true);
+}
+
+let openedOn = null; // the currency on the dial when the sheet opened
+function openSheet() {
+  openedOn = state.pair;
+  state.drafts = { [state.pair]: draftFor(state.pair) };
+  state.draft = state.drafts[state.pair];
+  state.knobDraft = [...state.knob];
+  const i = PAIRS.indexOf(state.pair);
+  place(codeWheel, Math.round(codeWheel.pos / PAIRS.length) * PAIRS.length + i, false);
+  showDraft(false);
   clearTimeout(closing);
   $('sheet-backdrop').classList.remove('closing');
   $('settings').classList.remove('closing', 'dragging', 'settling');
@@ -194,7 +306,7 @@ function openSheet() {
   $('sheet-backdrop').hidden = false;
   $('settings').hidden = false;
   liftWatch();
-  $('wheels-floor').querySelector('.wheel').focus({ preventScroll: true });
+  codeWheel.el.focus({ preventScroll: true });
 }
 
 // While the sheet is open the watch rises (and shrinks if it must) to sit
@@ -234,7 +346,10 @@ const quiet = matchMedia('(prefers-reduced-motion: reduce)');
 let closing = 0;
 function closeSheet() {
   if (!state.draft) return;
-  state.draft = null;
+  state.draft = state.drafts = state.knobDraft = null;
+  // Back to the currency it opened on, unless the one in the sheet is on the knob.
+  if (!state.knob.includes(state.pair)) state.pair = state.knob.includes(openedOn) ? openedOn : state.knob[0];
+  store.set('pair', state.pair);
   render(); // the dial drops the draft at once
   lowerWatch();
   const sheet = $('settings'), backdrop = $('sheet-backdrop');
@@ -304,6 +419,8 @@ pressable($('test'));
 pressable($('export'));
 $('sheet-close').addEventListener('click', closeSheet);
 $('sheet-backdrop').addEventListener('click', closeSheet);
+pressable($('toggle-knob'), () => haptic(8));
+$('toggle-knob').addEventListener('click', () => { sound('clack'); toggleKnob(); });
 for (const side of SIDES) {
   pressable($(`toggle-${side}`), () => haptic(8));
   $(`toggle-${side}`).addEventListener('click', () => { sound('clack'); toggleSide(side); });
@@ -312,14 +429,20 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.draf
 
 $('settings').addEventListener('submit', async e => {
   e.preventDefault();
-  if (crossed(draftLimits())) return;
-  const next = { ...state.limits, [state.pair]: draftLimits() };
+  // Every currency opened in the sheet is saved; one with floor above
+  // ceiling is turned to instead.
+  const bad = Object.keys(state.drafts).find(p => crossed(draftLimits(state.drafts[p])));
+  if (bad) {
+    if (bad !== state.pair) { place(codeWheel, codeWheel.pos + PAIRS.indexOf(bad) - PAIRS.indexOf(state.pair), true); switchTo(bad); }
+    return;
+  }
+  const next = Object.fromEntries(Object.entries(state.drafts).map(([p, d]) => [p, draftLimits(d)]));
   $('form-status').textContent = 'Saving…';
   try {
-    ({ limits: state.limits } = await getJSON('/api/settings', {
+    ({ limits: state.limits, knob: state.knob } = await getJSON('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ limits: next }),
+      body: JSON.stringify({ limits: next, knob: state.knobDraft }),
     }));
     closeSheet();
   } catch (err) {

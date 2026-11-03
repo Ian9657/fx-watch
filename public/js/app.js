@@ -19,8 +19,10 @@ async function loadRates() {
 }
 
 async function loadSettings() {
-  const { limits, lastCheck, tape = [], alerted = null, rearm = 0.001, failing = null, alertError = null } = await getJSON('/api/settings');
-  Object.assign(state, { limits, tape, lastCheck: lastCheck?.time ?? null, alerted, rearm, failing, alertError });
+  const { limits, knob = ['GBP', 'USD'], lastCheck, tape = [], alerted = null, rearm = 0.001, failing = null, alertError = null } = await getJSON('/api/settings');
+  Object.assign(state, { limits, knob, tape, lastCheck: lastCheck?.time ?? null, alerted, rearm, failing, alertError });
+  // Outside the sheet the dial reads a currency on the knob.
+  if (!state.draft && !knob.includes(state.pair)) state.pair = knob[0];
 }
 
 let refreshing = false;

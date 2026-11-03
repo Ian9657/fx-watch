@@ -554,7 +554,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .sheet-grip, .sheet-head { touch-action: none; cursor: grab; }
 .sheet.dragging { animation: none; }
 .sheet.settling { transition: transform .22s cubic-bezier(.2, .9, .3, 1); }
-.sheet-head { display: flex; align-items: center; gap: 8px; }
+.sheet-head { display: flex; align-items: center; gap: 6px; }
 .sheet-head h2 { margin-right: auto; }
 .sheet-x { position: relative; width: 36px; height: 36px; margin: -8px -10px -8px 0; padding: 0; border: 0; background: none; color: #8a8372; }
 /* The × is two hairlines, crisp at any size. */
@@ -566,7 +566,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .sheet-actions { display: flex; gap: 8px; }
 .btn-small { padding: 7px 12px; border: 0; border-radius: 2px; background: none; color: #a39c8a; font: 700 9px 'Cinzel', serif; letter-spacing: var(--track-mid); box-shadow: inset 0 0 0 1px #2c3640; }
 .btn-small.pressed { background: rgba(255,255,255,.05); color: #e9e1cc; }
-.sheet-head h2 { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #d8cfb8; letter-spacing: var(--track-wide); }
+.sheet-head h2 { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #d8cfb8; letter-spacing: var(--track-wide); }
 /* The currency wheel: a short drum of the eight codes, in a window like the number wheels'. */
 .code-wheel {
   position: relative;
@@ -589,7 +589,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--brass-light
 .code-wheel:focus-visible { outline: 2px solid var(--brass-light); outline-offset: 4px; }
 .code-wheel .drum { height: 22px; margin-top: -11px; }
 .code-wheel .drum span { line-height: 22px; font: 700 13px 'Cinzel', serif; letter-spacing: var(--track-mid); text-indent: .1em; }
-.toggle.toggle-knob { width: auto; min-height: 30px; padding: 0 8px; font-size: 9px; white-space: nowrap; }
+.toggle.toggle-knob { flex: none; width: 76px; min-height: 30px; padding: 0; font-size: 9px; white-space: nowrap; }
 .sheet-hint { white-space: nowrap; font: 700 10px 'Cinzel', serif; letter-spacing: var(--track-tight); color: #a39c8a; font-variant-numeric: lining-nums; }
 .sheet .note { text-align: left; }
 .sheet .note.bad { color: var(--error); }

@@ -10,8 +10,7 @@ Watches China CITIC Bank's GBP and USD buy prices, keeps their history, and send
 
 <br>
 
-<img src="docs/front.jpg" width="300" alt="The front of the watch: the needle in the TOO HIGH band, the price on number drums, and the floor and ceiling below"> &nbsp;&nbsp;
-<img src="docs/back.jpg" width="300" alt="The back of the watch: a round chart of the last seven days, with the floor and ceiling as rings">
+<img src="docs/hero.jpg" width="820" alt="The watch, front and back. The front: the needle in the TOO HIGH band and the price on number drums. The back: a round chart of the last seven days, with the floor and ceiling as rings">
 
 </div>
 

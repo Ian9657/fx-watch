@@ -9,10 +9,15 @@ export const unit = p => p === 'JPY' ? 100 : 1; // CITIC quotes yen per 100
 export const per = p => `${unit(p) === 1 ? '' : `${unit(p)} `}${p}`;
 export const SIDES = ['floor', 'ceiling'];
 
+// The public demo: the same page on recorded GBP and USD prices with sample
+// limits, no password and no settings. It keeps its own saved choices.
+export const DEMO = location.pathname === '/demo';
+export const REPO = 'https://github.com/Ian9657/fx-watch';
+const saved = key => DEMO ? `demo:${key}` : key;
 export const store = {
-  get: key => { try { return localStorage.getItem(key); } catch { return null; } },
-  set: (key, value) => { try { localStorage.setItem(key, value); } catch {} },
-  remove: key => { try { localStorage.removeItem(key); } catch {} },
+  get: key => { try { return localStorage.getItem(saved(key)); } catch { return null; } },
+  set: (key, value) => { try { localStorage.setItem(saved(key), value); } catch {} },
+  remove: key => { try { localStorage.removeItem(saved(key)); } catch {} },
 };
 
 export const state = {

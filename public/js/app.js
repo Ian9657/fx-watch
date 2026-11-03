@@ -1,9 +1,15 @@
 // Start-up: load prices and settings, keep them fresh, and handle the
 // password lock. The parts of the page live in their own modules.
-import { $, store, state, getJSON, Locked, showError, lock, unlock, pressable, feel, sound, haptic } from './shared.js';
+import { $, DEMO, store, state, getJSON, Locked, showError, lock, unlock, pressable, feel, sound, haptic } from './shared.js';
 import { buildFace, render, renderStatus } from './dial.js';
 import { loadHistory, turned } from './back.js';
 import './sheet.js';
+
+async function loadDemo() {
+  const { rates, limits, knob, tape } = await getJSON('/api/demo');
+  Object.assign(state, { rates, limits, knob, tape, lastCheck: Date.now(), lastGood: Date.now(), feedError: null });
+  if (!knob.includes(state.pair)) state.pair = knob[0];
+}
 
 async function loadRates() {
   try {
@@ -27,12 +33,12 @@ async function loadSettings() {
 
 let refreshing = false;
 async function refreshAll() {
-  if (refreshing || !store.get('password')) return;
+  if (refreshing || (!DEMO && !store.get('password'))) return;
   refreshing = true;
   $('refresh').disabled = true;
   try {
     // History (up to ~90 KB) is only fetched while the back is showing.
-    await Promise.all([loadSettings(), loadRates(), turned() ? loadHistory() : null]);
+    await Promise.all([...(DEMO ? [loadDemo()] : [loadSettings(), loadRates()]), turned() ? loadHistory() : null]);
     const wasLocked = !$('lock').hidden;
     unlock();
     showError('');
@@ -127,6 +133,12 @@ if (navigator.serviceWorker) {
 }
 
 buildFace();
-if (store.get('password')) refreshAll().then(fit);
+if (DEMO) {
+  document.title = 'FX Watch demo';
+  document.querySelector('.masthead .small').textContent = 'DEMO · SAMPLE LIMITS';
+  $('toggle-settings').textContent = 'View on GitHub';
+  $('toggle-settings').removeAttribute('aria-haspopup');
+}
+if (DEMO || store.get('password')) refreshAll().then(fit);
 else lock();
 fit();

@@ -120,6 +120,34 @@ export function beijingDay(ms) {
 
 export const SIDES = ['floor', 'ceiling'];
 
+// The public demo (/demo): recorded GBP and USD prices only, the last
+// FULL_DAYS of them, with sample limits drawn from their own range, so it
+// shows nothing of the owner's limits or alert state and calls no one.
+export const DEMO_PAIRS = ['GBP', 'USD'];
+function sampleLimits(prices) {
+  if (!prices.length) return { floor: null, ceiling: null };
+  const lo = Math.min(...prices), hi = Math.max(...prices), last = prices.at(-1);
+  const flat = hi - lo < last * 0.002; // too narrow a week for bands to read
+  return {
+    floor: +(flat ? last * 0.997 : lo + (hi - lo) * 0.2).toFixed(4),
+    ceiling: +(flat ? last * 1.003 : hi - (hi - lo) * 0.2).toFixed(4),
+  };
+}
+// rows: [t, GBP, USD], oldest first. midnight: when today began (epoch s).
+export function demoPayload(rows, midnight) {
+  const series = i => rows.filter(r => r[i + 1] != null);
+  const entries = fn => Object.fromEntries(DEMO_PAIRS.flatMap((p, i) => fn(p, i)));
+  const rates = entries((p, i) => {
+    const s = series(i), last = s.at(-1);
+    if (!last) return [];
+    const before = s.filter(r => r[0] < midnight).at(-1);
+    return [[p, { price: last[i + 1], time: last[0], previousClose: before?.[i + 1] ?? null }]];
+  });
+  const limits = entries((p, i) => [[p, sampleLimits(series(i).map(r => r[i + 1]))]]);
+  const tape = rows.slice(-TAPE_LENGTH).reverse().map(([t, ...prices]) => ({ t, ...Object.fromEntries(DEMO_PAIRS.map((p, i) => [p, prices[i]])) }));
+  return { pairs: DEMO_PAIRS, history: rows, rates, limits, knob: DEMO_PAIRS, tape };
+}
+
 // The currencies on the dial's knob, in the order its stops turn through:
 // one to four of PAIRS, chosen in the settings sheet.
 export const KNOB = ['GBP', 'USD'];

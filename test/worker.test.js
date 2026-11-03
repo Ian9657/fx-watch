@@ -186,6 +186,25 @@ test('API requests over the limit are refused before the password is checked', a
   assert.equal((await call('pw')).status, 429);
 });
 
+test('the demo is public and shows only recorded GBP and USD, with sample limits', async () => {
+  const store = fakeKV({ limits: { GBP: { floor: 8.9321, ceiling: null } }, data: { alerted: { GBP: { floor: 8.9321, ceiling: false } } } });
+  network(() => { throw new Error('the demo must not call out'); });
+  const today = daysBack(beijingDay(Date.now()), 1)[0];
+  const t = Math.floor(Date.now() / 1000);
+  await store.put(`h:${today}`, JSON.stringify({ codes: ['USD', 'GBP', 'EUR'], rows: [[t - 7200, 660, 890, 740, 655, 885, 735], [t - 3600, 670, 900, 750, 665, 895, 745]] }));
+  const res = await worker.fetch(new Request('https://x/api/demo'), env(store));
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.pairs, ['GBP', 'USD']);
+  assert.deepEqual(Object.keys(body.rates), ['GBP', 'USD']);
+  assert.equal(body.rates.GBP.price, 9);
+  assert.deepEqual(body.history.at(-1), [t - 3600, 9, 6.7]);
+  assert.equal(body.tape.length, 2);
+  const text = JSON.stringify(body);
+  assert.ok(!text.includes('8.9321') && !text.includes('alerted') && !text.includes('EUR'));
+  assert.ok(body.limits.GBP.floor < body.limits.GBP.ceiling);
+});
+
 test('a check carries on when a currency is missing, and fails when all are', async () => {
   const store = fakeKV({ limits });
   const usdOnly = 'cb(' + JSON.stringify({ content: { resultList: [{ quotePriceDate: '2026年10月27日', quotePriceTime: '20:00:00', curCode: '014001', cstexcSellPrice: '669.00', cstexcBuyPrice: '666.00' }] } }) + ')';

@@ -1,6 +1,6 @@
 // The front of the watch: the dial, the digit window, the status line and
 // the currency knob.
-import { $, store, state, time, per, limitsFor, span, position, pressable, feel, sound, haptic } from './shared.js';
+import { $, DEMO, store, state, time, per, limitsFor, span, position, pressable, feel, sound, haptic } from './shared.js';
 import { drawTape } from './tape.js';
 import { drawChart, turned } from './back.js';
 
@@ -42,6 +42,10 @@ export function renderStatus() {
   } else if (alertError && minutesAgo(alertError.time) < 24 * 60) {
     level = 'error';
     text = `TELEGRAM FAILED AT ${time(new Date(alertError.time))}`;
+  }
+  if (DEMO) {
+    level = feedError || !quoteTime ? 'error' : 'ok';
+    text = quoteTime && !feedError ? `DEMO · RECORDED ${time(new Date(quoteTime))}` : 'DEMO · NO DATA';
   }
   if (state.winding) text = 'WINDING…';
   $('refresh').className = `status ${level}${state.winding ? ' winding' : ''}`;

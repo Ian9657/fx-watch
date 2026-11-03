@@ -9,7 +9,7 @@
 
 单用户 Web 应用：跟踪中信银行 8 种货币的购汇价，记录历史，并在价格越过下限或上限时发送 Telegram 提醒。
 
-[fx.etarc.net](https://fx.etarc.net) · Cloudflare Workers + KV · 原生 JS，零依赖，无构建步骤
+[在线演示](https://fx.etarc.net/demo) · Cloudflare Workers + KV · 原生 JS，零依赖，无构建步骤
 
 <br>
 
@@ -71,8 +71,9 @@ Workers KV，绑定名 `STORE`：
 
 ## 安全
 
-- 所有 `/api/*` 路由都需要 `Authorization: Bearer <password>`；Worker 对 SHA-256 摘要使用 `crypto.subtle.timingSafeEqual` 比较。
-- 校验密码之前，先由 [Rate Limiting 绑定](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)限制每个地址每分钟最多 60 次 API 请求（按 Cloudflare 节点分别计数），以减慢密码猜测。页面自身每分钟约 10 次请求。
+- `/demo` 和 `/api/demo` 是公开的。它们提供最近 8 天记录的英镑、美元价格和示例上下限，缓存 5 分钟，不包含已保存的上下限和提醒状态。演示版没有设置面板、提醒和 CSV，表圈只有 24 小时和 7 天。
+- 其余 `/api/*` 路由都需要 `Authorization: Bearer <password>`；Worker 对 SHA-256 摘要使用 `crypto.subtle.timingSafeEqual` 比较。
+- 校验密码之前（演示接口同样如此），先由 [Rate Limiting 绑定](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)限制每个地址每分钟最多 60 次 API 请求（按 Cloudflare 节点分别计数），以减慢密码猜测。页面自身每分钟约 10 次请求。
 - 密码按设备保存在 `localStorage`，收到 401 时清除并显示锁屏。
 - 对外请求只有中信汇率数据和 Telegram Bot API。不加载任何第三方脚本、字体或统计；字体自行托管。
 

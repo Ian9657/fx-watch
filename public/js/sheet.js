@@ -2,7 +2,7 @@
 // for that currency's floor and ceiling, and whether it's on the knob.
 // While it's open the dial reads the currency in the sheet and previews its
 // draft, so you can see where a new floor or ceiling would sit before saving.
-import { $, PAIRS, SIDES, KNOB_MAX, state, store, getJSON, Locked, lock, draftLimits, crossed, pressable, feel, sound, haptic } from './shared.js';
+import { $, DEMO, REPO, PAIRS, SIDES, KNOB_MAX, state, store, getJSON, Locked, lock, draftLimits, crossed, pressable, feel, sound, haptic } from './shared.js';
 import { render } from './dial.js';
 import { downloadHistory } from './back.js';
 
@@ -405,7 +405,7 @@ for (const handle of [sheet.querySelector('.sheet-grip'), sheet.querySelector('.
   handle.addEventListener('pointercancel', release);
 }
 
-$('toggle-settings').addEventListener('click', openSheet);
+$('toggle-settings').addEventListener('click', DEMO ? () => { location.href = REPO; } : openSheet);
 // "Set to now": dial a side straight to the current price.
 for (const side of SIDES) {
   const button = $(`now-${side}`);

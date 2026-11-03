@@ -1,6 +1,6 @@
 // The back of the watch: a round chart of the recorded price, the bezel
 // that sets its time span, and turning the watch over.
-import { $, store, state, getJSON, Locked, limitsFor, position, sound, haptic } from './shared.js';
+import { $, DEMO, store, state, getJSON, Locked, limitsFor, position, sound, haptic } from './shared.js';
 
 // ---- Chart ---------------------------------------------------------------
 // A circular chart recorder: the paper turns once per span, the pen sits at
@@ -12,7 +12,7 @@ import { $, store, state, getJSON, Locked, limitsFor, position, sound, haptic } 
 let history = [];  // [t, ...one price per pair] rows the Worker has recorded, oldest first
 let pairs = [];    // the currencies in those rows, in order
 let historyAt = 0; // when history was last loaded (epoch ms)
-const SPANS = [1, 7, 30, 90]; // days, shown one at a time in the bezel's window
+const SPANS = DEMO ? [1, 7, 1, 7] : [1, 7, 30, 90]; // days, shown one at a time in the bezel's window
 let days = SPANS.includes(Number(store.get('chartDays'))) ? Number(store.get('chartDays')) : 7;
 const HOUR = 3600, DAY = 86400, GAP = 2 * HOUR;
 const local = t => new Date(t * 1000); // days and hours are this device's, like every time on the page
@@ -23,7 +23,7 @@ const spanWords = d => d === 1 ? '24 hours' : `${d} days`;
 export async function loadHistory() {
   if (Date.now() - historyAt < 10 * 60_000) return; // it only grows every 10 minutes
   try {
-    ({ history, pairs } = await getJSON('/api/history'));
+    ({ history, pairs } = await getJSON(DEMO ? '/api/demo' : '/api/history'));
     historyAt = Date.now();
   } catch (err) {
     if (err instanceof Locked) throw err; // otherwise keep the last chart

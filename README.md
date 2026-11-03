@@ -7,11 +7,9 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-**A pocket watch for one exchange rate.**
+A single-user web app that tracks China CITIC Bank's GBP and USD buy prices, records their history, and sends Telegram alerts at a floor and a ceiling.
 
-Watches China CITIC Bank's GBP and USD buy prices, keeps their history, and sends a Telegram message when a price crosses the floor or ceiling you set.
-
-[**fx.etarc.net**](https://fx.etarc.net) · Cloudflare Workers · no dependencies, no build step
+[fx.etarc.net](https://fx.etarc.net) · Cloudflare Workers + KV · vanilla JS, no dependencies, no build step
 
 <br>
 
@@ -69,18 +67,16 @@ Workers KV, binding `STORE`:
 - The password is kept per device in `localStorage`. A 401 clears it and shows the lock.
 - Outbound requests go only to the CITIC feed and the Telegram Bot API. No third-party scripts, fonts or analytics; fonts are self-hosted.
 
-## Design
+## UI
 
-The whole interface is a single pocket watch: navy, ivory, and one brass case. A few rules hold it together:
+The interface is one SVG pocket watch, drawn and animated in CSS and JS without images. The constraints, kept at the top of [`public/style.css`](public/style.css):
 
-- **One light, from the upper left.** Every highlight and shadow on every part agrees with it
-- **Every part is mounted.** Nothing floats on a drop shadow; parts sit in or on the watch
-- **Gold belongs to the watch.** The rest of the page stays in the navy and ivory palette
-- **Mechanical feel comes from behaviour, not ornament.** Drums roll, the bezel clicks round one way, the hand sweeps up from rest. No gears are painted on
+- One light source, upper left. Every highlight, gradient and inset shadow follows it.
+- Every part is mounted in or on the case. No floating drop shadows.
+- Brass is reserved for the watch. The rest of the page uses only navy and ivory.
+- Mechanical feel comes from motion, sound and haptics, not ornament: drums roll, the bezel clicks one way, the hand sweeps up from rest.
 
-The same rules open [`public/style.css`](public/style.css).
-
-## How it works
+## Architecture
 
 ```mermaid
 flowchart TB
@@ -91,47 +87,43 @@ flowchart TB
   worker -- "alerts" --> tg["Telegram"]
 ```
 
-| Part | Where |
+| Path | Role |
 |---|---|
-| Web app: one ES module per part of the page (dial, tape, back, settings sheet, shared state, start-up) | `public/`, `public/js/` |
-| API: `/api/rates`, `/api/history`, `/api/settings`, `/api/test` | `src/worker.js` |
-| Feed parsing, alert rules, messages (pure functions, unit-tested) | `src/logic.js` |
-| History: one KV record per Beijing day (`h:YYYY-MM-DD`), each expiring after 92 days, so a check reads and writes only today's record | Workers KV |
-| Offline copy: network first, cached copy as fallback | `public/sw.js` |
+| `src/worker.js` | API routes (`/api/rates`, `/api/history`, `/api/settings`, `/api/test`), scheduled check, KV I/O, Telegram |
+| `src/logic.js` | Pure functions: JSONP feed parsing, history rows, alert evaluation, messages, settings migrations |
+| `public/js/` | ES modules, one per part of the page: `dial`, `tape`, `back` (chart and bezel), `sheet`, `shared`, `app` (start-up) |
+| `public/sw.js` | Service worker for the offline copy |
+| `test/` | `node:test` suites: the logic, and the Worker end to end against an in-memory KV with fake CITIC and Telegram |
+| `scripts/check-screens.mjs` | Headless Chrome over the DevTools protocol, at six viewport sizes |
 
-Written in plain JavaScript, HTML and CSS: no framework, no bundler, no npm dependencies.
+## Development
 
-## Develop
+Requires Node 24.
 
 ```sh
 echo 'EDIT_PASSWORD=localtest' > .dev.vars
-npm run dev            # http://localhost:8787
-npm test               # unit tests for the logic and the Worker
-npm run check:screens  # with dev running: six screen sizes in headless Chrome
+npm run dev            # wrangler dev, http://localhost:8787
+npm test               # node --test
+npm run check:screens  # needs npm run dev
 ```
 
-`check:screens` opens the app at phone and desktop sizes. At each size it checks that the app fits one screen and throws no errors, then turns the watch over, turns the knob, drags a wheel and opens the settings sheet. Screenshots are saved to `screens/`.
+At each size, `check:screens` asserts that the layout fits one screen without scrolling and that there are no console errors. It then drives the real controls (turns the watch over, turns the knob, drags a wheel, opens the settings sheet), checks that each one responded, and saves screenshots to `screens/`. CI runs `npm test` on every push to `main`.
 
-## Deploy
+## Deployment
 
-Pushing to `main` deploys through Cloudflare Workers Builds. The Worker name must stay `fx-watch`.
+Pushing to `main` deploys through Cloudflare Workers Builds. The Worker name must stay `fx-watch`. Secrets, under fx-watch → Settings → Variables and Secrets:
 
-Set the following secrets in the Cloudflare dashboard (fx-watch → Settings → Variables and Secrets):
-
-| Name | What |
+| Name | Purpose |
 |---|---|
-| `EDIT_PASSWORD` | Password to open the app and change limits |
-| `TELEGRAM_BOT_TOKEN` | From @BotFather |
-| `TELEGRAM_CHAT_ID` | Your chat ID with the bot |
+| `EDIT_PASSWORD` | API password |
+| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
+| `TELEGRAM_CHAT_ID` | Chat to send alerts to |
 
-## Install
-
-- **iPhone:** open the site in Safari → Share → Add to Home Screen
-- **Mac:** open the site in Safari → File → Add to Dock
+To install on a device, open the site in Safari, then Share → Add to Home Screen (iPhone) or File → Add to Dock (Mac).
 
 ## Credits
 
-Fonts (Cinzel, Cormorant Garamond, Playfair Display, Special Elite) are self-hosted under the SIL Open Font License.
+Fonts: Cinzel, Cormorant Garamond, Playfair Display and Special Elite, all under the SIL Open Font License.
 
 ## License
 

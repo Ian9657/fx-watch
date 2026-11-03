@@ -7,11 +7,9 @@
 
 [English](README.md) | **简体中文**
 
-**一块只看一个汇率的怀表。**
+单用户 Web 应用：跟踪中信银行英镑、美元购汇价，记录历史，并在价格越过下限或上限时发送 Telegram 提醒。
 
-盯着中信银行英镑和美元的购汇价，记录历史走势，价格越过你设定的下限或上限时发 Telegram 消息提醒你。
-
-[**fx.etarc.net**](https://fx.etarc.net) · Cloudflare Workers · 零依赖，无需构建
+[fx.etarc.net](https://fx.etarc.net) · Cloudflare Workers + KV · 原生 JS，零依赖，无构建步骤
 
 <br>
 
@@ -20,110 +18,112 @@
 </div>
 
 > [!NOTE]
-> 价格来自中信银行官网汇率表背后的公开数据，仅供参考。实际交易以中信银行 App 中的价格为准。
+> 价格来自中信银行官网汇率表背后的公开数据，仅供参考，以交易时中信银行 App 中的价格为准。
 
-## 为什么做这个
-
-中信银行只公布当前的购汇价，不提供历史走势，也没有价格提醒。想等个好价格换汇，就只能一遍遍手动去查。FX Watch 每十分钟查一次，记下每个新报价，价格值得出手时通知你。
+中信只公布当前报价，没有历史数据，也没有提醒。Cron Trigger 每 10 分钟拉取一次报价，Worker 把每个新报价写入 KV，页面再从 KV 读回历史。
 
 ## 功能
 
-### 正面
+**表盘（正面）**
+- 指针位置由价格映射到以上下限构建的刻度上：下限对应 0.3，上限对应 0.7，结果限制在 [0.02, 0.98]。分为 BUY / HOLD / TOO HIGH 三段。
+- 数字滚轮显示价格，附相对前一日最后报价的涨跌，顶部纸带显示最近 12 条记录。
+- 旋钮切换 GBP / USD，表冠触发刷新。页面可见时每 30 秒自动刷新，获得焦点或从后台恢复时也会刷新。
 
-- **一眼看出价格处在什么位置。** 指针落在按你自己的下限和上限划分的表盘上，分为 **BUY · HOLD · TOO HIGH** 三段。
-- **数字滚轮显示精确价格**，旁边有相对昨日收盘的涨跌，顶部的纸带滚动显示最近几次报价。
-- **转动旋钮切换币种**，按一下表冠就是给表上弦，同时刷新数据。
-
-### 背面
-
-- **把表翻过来看历史。** 背面是一台圆形记录仪，可以看 24 小时、7 天、30 天或 90 天。
-- **转动表圈切换时段**，当前时段显示在十二点位置的小窗里，像日历表的日期窗。
-- **下限和上限在图上是两道圆环。** 休市期间没有新报价，曲线会保持最后的价格，直到下一个报价出现。
+**走势图（背面）**
+- SVG 极坐标图：每个时段（24 小时、7 天、30 天、90 天）转一圈，时间从顶部顺时针推进，价格沿半径向外，刻度与表盘一致。
+- 最多抽样到约 900 个点（90 天约有 13,000 条报价）。
+- 报价在下一条出现前一直有效，所以休市期间（周末）曲线沿等半径圆弧保持原价，再跳到新价格。
+- 时段由表圈设置：表圈只能单向转动，每格 3°，当前时段显示在十二点位置的窗口里。
 
 <p align="center"><img src="docs/turn.webp" width="300" alt="怀表翻到背面的走势图，表圈从 7 天转到 30 天再到 90 天，然后翻回正面"></p>
 
-### 提醒
-
-- **每个币种都能设下限和上限**，用数字滚轮调节，保存前表盘会先预览效果。
-- **越过界限时发一条消息**，价格一直停在界外的话，每 4 小时再提醒一次。价格要回到界内超过 0.1% 才会重新开始监测，所以价格在界限附近来回波动时，不会反复收到提醒。
-- **检查停了也会告诉你。** 如果每十分钟的检查连续失败，会发消息通知；恢复正常后再通知一次。
+**提醒**
+- 每个币种可分别设置下限和上限，用数字滚轮输入，保存前在表盘上预览。
+- 每一侧的提醒状态会记下触发时对应的界限值：越界时发送一次，价格停留在界外期间每 4 小时重复一次；价格回到界内超过 0.1% 后才重新布防（迟滞）。
+- 发送失败会在下一次检查时重试。检查连续失败 3 次后发送“检查失败”通知，恢复后再发一条“已恢复”。
 
 <p align="center"><img src="docs/sheet.jpg" width="300" alt="怀表下方打开的设置面板：下限 8.9300、上限 8.9800 显示在数字滚轮上，各有一个 ON 开关，下面是保存按钮"></p>
 
-### 日常使用
+**客户端**
+- 可安装的 PWA。Service Worker 采用网络优先、缓存兜底；缓存的 API 响应带 `X-Offline` 时间戳，页面据此标注过期数据。
+- 音效由 Web Audio 用滤波噪声实时合成，不含音频文件。触感反馈使用 `navigator.vibrate`，iOS Safari 上通过切换一个隐藏的 `<input type="checkbox" switch>` 实现。
+- 遵循 `prefers-reduced-motion`。
 
-- **像 App 一样安装**到 iPhone 主屏幕或 Mac 程序坞。没网时也能打开，显示最后一次的价格，并标注 OFFLINE。
-- **每个控件都有手感。** 轻微的声音和触感反馈；如果系统设置了减弱动态效果，动画也会相应减少。
+## 数据
 
-## 隐私
+Workers KV，绑定名 `STORE`：
 
-- **有密码保护。** 每台设备只需输入一次。没有密码，接口什么也不返回；比对密码时用的方法也防得住靠测量响应时间来猜密码。
-- **数据都在你自己的 Cloudflare 账户里。** 上下限、提醒状态和价格历史都存在你的 Workers KV 中，历史记录 92 天后自动过期。
-- **不连接任何其他服务。** Worker 只访问中信的汇率数据，发提醒时再访问 Telegram。页面不加载任何第三方脚本、字体或统计工具。
+| 键 | 内容 | 写入方 |
+|---|---|---|
+| `limits` | `{ GBP: { floor, ceiling }, USD: … }` | 仅 `PUT /api/settings` |
+| `data` | 提醒状态、上次检查、失败计数 | 仅 10 分钟检查 |
+| `h:YYYY-MM-DD` | 北京时间某一天的 `[t, GBP, USD]` 行，最多 144 行（约 4 KB），TTL 92 天 | 10 分钟检查 |
 
-## 设计
+`limits` 和 `data` 各只有一个写入方，保存设置和定时检查不会互相覆盖。每次检查只读写当天的记录，报价时间没变时不写入。
 
-整个界面就是一块怀表：藏青色、象牙白，加一只黄铜表壳。贯穿始终的几条规则：
+## 安全
 
-- **只有一个光源，在左上方。** 每个零件的高光和阴影都和它一致。
-- **每个零件都装在表上。** 不靠投影悬浮，所有部件都嵌在表里或装在表上。
-- **金色只属于表。** 页面其余部分只用藏青和象牙白。
-- **机械感来自动作，而不是装饰。** 滚轮会滚动，表圈只朝一个方向一格一格地转，指针从静止扫到位。不画任何齿轮。
+- 所有 `/api/*` 路由都需要 `Authorization: Bearer <password>`；Worker 对 SHA-256 摘要使用 `crypto.subtle.timingSafeEqual` 比较。
+- 密码按设备保存在 `localStorage`，收到 401 时清除并显示锁屏。
+- 对外请求只有中信汇率数据和 Telegram Bot API。不加载任何第三方脚本、字体或统计；字体自行托管。
 
-这几条规则也写在 [`public/style.css`](public/style.css) 的开头。
+## 界面
 
-## 工作原理
+界面是一块 SVG 怀表，完全由 CSS 和 JS 绘制、驱动，不使用图片。约束写在 [`public/style.css`](public/style.css) 开头：
+
+- 只有一个光源，位于左上方。所有高光、渐变和内阴影都以它为准。
+- 每个部件都嵌在表壳里或装在表壳上，不使用悬浮投影。
+- 黄铜色只用于怀表本身，页面其余部分只用藏青和象牙白。
+- 机械感来自动作、声音和触感，而不是装饰：滚轮滚动，表圈单向一格格转动，指针从静止扫到位。
+
+## 架构
 
 ```mermaid
 flowchart TB
   app["网页<br/>public/"] -- "/api/*" --> worker["Cloudflare Worker<br/>src/worker.js"]
-  cron(["定时任务 · 每 10 分钟"]) --> worker
+  cron(["Cron · 每 10 分钟"]) --> worker
   worker -- "报价" --> citic["中信汇率数据"]
   worker <-- "读 · 写" --> kv[("Workers KV")]
   worker -- "提醒" --> tg["Telegram"]
 ```
 
-| 部分 | 位置 |
+| 路径 | 作用 |
 |---|---|
-| 网页：页面的每个部分各是一个 ES 模块（表盘、纸带、背面、设置面板、共享状态、启动） | `public/`、`public/js/` |
-| 接口：`/api/rates`、`/api/history`、`/api/settings`、`/api/test` | `src/worker.js` |
-| 解析报价、提醒规则、消息文字（纯函数，有单元测试） | `src/logic.js` |
-| 历史：按北京时间每天一条 KV 记录（`h:YYYY-MM-DD`），各自 92 天后过期，所以每次检查只读写当天这一条 | Workers KV |
-| 离线副本：优先从网络获取，断网时用缓存 | `public/sw.js` |
-
-全部用原生 JavaScript、HTML 和 CSS 写成：没有框架，没有打包工具，没有 npm 依赖。
+| `src/worker.js` | API 路由（`/api/rates`、`/api/history`、`/api/settings`、`/api/test`）、定时检查、KV 读写、Telegram |
+| `src/logic.js` | 纯函数：JSONP 报价解析、历史行处理、提醒判定、消息文本、设置迁移 |
+| `public/js/` | ES 模块，页面每个部分一个：`dial`、`tape`、`back`（走势图和表圈）、`sheet`、`shared`、`app`（启动） |
+| `public/sw.js` | 离线副本的 Service Worker |
+| `test/` | `node:test` 测试：逻辑单元测试，以及用内存 KV、模拟中信和 Telegram 的 Worker 端到端测试 |
+| `scripts/check-screens.mjs` | 通过 DevTools 协议驱动无界面 Chrome，覆盖六种视口尺寸 |
 
 ## 开发
 
+需要 Node 24。
+
 ```sh
 echo 'EDIT_PASSWORD=localtest' > .dev.vars
-npm run dev            # http://localhost:8787
-npm test               # 逻辑和 Worker 的单元测试
-npm run check:screens  # 需先运行 dev：在无界面 Chrome 里检查六种屏幕尺寸
+npm run dev            # wrangler dev，http://localhost:8787
+npm test               # node --test
+npm run check:screens  # 需先运行 npm run dev
 ```
 
-`check:screens` 会以手机和桌面的多种尺寸打开应用。每种尺寸下，它先检查页面是否刚好一屏放下、有没有报错，再把表翻过来、转动旋钮、拖动一个滚轮、打开设置面板。截图保存在 `screens/`。
+`check:screens` 在每种尺寸下检查布局是否一屏放下、不出现滚动，控制台是否无报错；然后实际操作控件（翻转怀表、转动旋钮、拖动滚轮、打开设置面板），确认每一项都有响应，并把截图保存到 `screens/`。CI 在每次推送到 `main` 时运行 `npm test`。
 
 ## 部署
 
-推送到 `main` 后，Cloudflare Workers Builds 会自动部署。Worker 的名字必须保持为 `fx-watch`。
-
-在 Cloudflare 控制台（fx-watch → Settings → Variables and Secrets）里设置以下密钥：
+推送到 `main` 后由 Cloudflare Workers Builds 自动部署，Worker 名称必须保持为 `fx-watch`。密钥在 fx-watch → Settings → Variables and Secrets 中设置：
 
 | 名称 | 用途 |
 |---|---|
-| `EDIT_PASSWORD` | 打开应用、修改上下限用的密码 |
-| `TELEGRAM_BOT_TOKEN` | 从 @BotFather 获取 |
-| `TELEGRAM_CHAT_ID` | 你和机器人对话的 chat ID |
+| `EDIT_PASSWORD` | API 密码 |
+| `TELEGRAM_BOT_TOKEN` | 从 @BotFather 获取的机器人 token |
+| `TELEGRAM_CHAT_ID` | 接收提醒的会话 |
 
-## 安装
-
-- **iPhone：** 用 Safari 打开网站 → 分享 → 添加到主屏幕
-- **Mac：** 用 Safari 打开网站 → 文件 → 添加到程序坞
+安装到设备：用 Safari 打开网站，iPhone 上选 分享 → 添加到主屏幕，Mac 上选 文件 → 添加到程序坞。
 
 ## 致谢
 
-字体（Cinzel、Cormorant Garamond、Playfair Display、Special Elite）均自行托管，遵循 SIL Open Font License。
+字体：Cinzel、Cormorant Garamond、Playfair Display、Special Elite，均采用 SIL Open Font License。
 
 ## 许可证
 

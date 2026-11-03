@@ -20,46 +20,54 @@ Watches China CITIC Bank's GBP and USD buy prices, keeps their history, and send
 </div>
 
 > [!NOTE]
-> Prices come from the public feed behind the rate table on citicbank.com and are for reference only. The price shown in the CITIC app when you trade is final.
+> Prices come from the public feed behind the rate table on citicbank.com and are for reference only. The price in the CITIC app at the time of trade is final.
 
-## Why
-
-CITIC Bank publishes its current buy price and nothing else: no history and no alerts. If you're waiting for a good moment to change money, that means checking by hand. FX Watch checks every ten minutes, records each new quote, and tells you when the price is worth acting on.
+CITIC publishes only its current quote: no history, no alerts. A Cron Trigger polls the feed every 10 minutes, the Worker stores each new quote in KV, and the page reads the history back from there.
 
 ## Features
 
-### On the front
+**Dial (front)**
+- Needle position is the price mapped onto a scale built from the floor and ceiling: floor at 0.3, ceiling at 0.7, clamped to [0.02, 0.98]. Bands read BUY / HOLD / TOO HIGH.
+- Price on number drums, change against the previous day's last quote, and a tape of the last 12 recorded quotes.
+- The knob switches GBP / USD. The crown refreshes; the page also refreshes every 30 s while visible, and on focus or resume.
 
-- **See where the price stands at a glance.** The needle sits on a dial banded **BUY · HOLD · TOO HIGH**, drawn from your own floor and ceiling.
-- **Read the exact price** on number drums, with the change since yesterday's close and a ticker tape of recent quotes.
-- **Switch currency with the knob**, and press the crown to wind the watch, which refreshes it.
-
-### On the back
-
-- **Turn the watch over for its history.** The back is a circular chart recorder covering 24 hours, 7, 30 or 90 days.
-- **Turn the bezel to change the span**, shown in a date-style window at twelve.
-- **See your limits on the chart** as two rings. When the market is closed, the trace holds the last price until a new quote arrives.
+**Chart (back)**
+- Polar chart in SVG: one turn per span (24 h, 7 d, 30 d or 90 d), time clockwise from the top, price outward on the dial's scale.
+- Thinned to at most ~900 points (90 days is about 13,000 quotes).
+- A quote stands until the next one, so over a quiet spell (weekends) the trace follows a constant-radius arc and then steps to the new price.
+- The span is set by a bezel that turns one way in 3° clicks, read through a window at twelve.
 
 <p align="center"><img src="docs/turn.webp" width="300" alt="The watch turning over to its chart, the bezel clicking round from 7 to 30 to 90 days, and turning back"></p>
 
-### Alerts
-
-- **Set a floor and a ceiling for each currency** with number wheels. The dial previews the change before you save.
-- **Get one message when a limit is crossed**, and a reminder every 4 hours while the price stays outside it. An alert re-arms only after the price comes back inside by more than 0.1%, so a price hovering at a limit doesn't keep alerting.
-- **Know when checking stops.** If the 10-minute check keeps failing you're told, and told again when it recovers.
+**Alerts**
+- Each currency has an optional floor and ceiling, set on digit wheels and previewed on the dial before saving.
+- Per side, the alert state records the limit it fired for. It sends once on crossing, repeats every 4 h while the price stays outside, and re-arms only once the price is back inside by more than 0.1% (hysteresis).
+- A failed send is retried on the next check. After 3 failed checks in a row a "checks failing" message goes out, then a "recovered" one.
 
 <p align="center"><img src="docs/sheet.jpg" width="300" alt="The settings sheet open under the watch: floor 8.9300 and ceiling 8.9800 on number wheels, each with an ON switch, and a Save button"></p>
 
-### Everyday use
+**Client**
+- Installable PWA. The service worker is network-first with a cache fallback; cached API responses carry an `X-Offline` timestamp so the page can mark stale data.
+- Sounds are synthesised in Web Audio from filtered noise bursts, with no audio files. Haptics use `navigator.vibrate`, and on iOS Safari the toggle of a hidden `<input type="checkbox" switch>`.
+- Honours `prefers-reduced-motion`.
 
-- **Install it like an app** on the iPhone home screen or the Mac Dock. It opens offline with the last prices, marked OFFLINE.
-- **Feel every control.** Quiet sounds and haptics throughout, with motion reduced when the system asks for it.
+## Data
 
-## Privacy
+Workers KV, binding `STORE`:
 
-- **Locked by a password.** Each device asks for it once. Without it the API returns nothing, and the Worker compares it in constant time.
-- **Your data stays in your own Cloudflare account.** Limits, alert state and price history live in your Workers KV, and history expires on its own after 92 days.
-- **Nothing else is contacted.** The Worker talks only to the CITIC rate feed and, for alerts, Telegram. The page loads no third-party scripts, fonts or analytics.
+| Key | Contents | Written by |
+|---|---|---|
+| `limits` | `{ GBP: { floor, ceiling }, USD: … }` | `PUT /api/settings` only |
+| `data` | alert state, last check, failure count | the 10-minute check only |
+| `h:YYYY-MM-DD` | `[t, GBP, USD]` rows for one Beijing day, ≤144 rows (~4 KB), TTL 92 days | the 10-minute check |
+
+`limits` and `data` each have one writer, so a save and a check can't overwrite each other. A check reads and writes only today's record, and skips the write when the quote time hasn't changed.
+
+## Security
+
+- Every `/api/*` route needs `Authorization: Bearer <password>`; the Worker compares SHA-256 digests with `crypto.subtle.timingSafeEqual`.
+- The password is kept per device in `localStorage`. A 401 clears it and shows the lock.
+- Outbound requests go only to the CITIC feed and the Telegram Bot API. No third-party scripts, fonts or analytics; fonts are self-hosted.
 
 ## Design
 

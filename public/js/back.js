@@ -1,7 +1,7 @@
 // The back of the watch: a round chart of the recorded price, the bezel
 // that sets its time span, and turning the watch over.
 import { sampleData } from './demo.js';
-import { $, DEMO, store, state, getJSON, Locked, limitsFor, position, sound, haptic } from './shared.js';
+import { $, DEMO, store, state, getJSON, Locked, limitsFor, span, sound, haptic } from './shared.js';
 
 // ---- Chart ---------------------------------------------------------------
 // A circular chart recorder: the paper turns once per span, the pen sits at
@@ -121,16 +121,21 @@ export function drawChart() {
     const [x, y] = polar(R_LABEL, deg);
     out.push(`<text class="tick-label" x="${x}" y="${y}">${rule.label(local(t))}</text>`);
   }
-  // Price runs outward on the front's scale, opened out so the HOLD band is
-  // wide: the floor ring (0.3 on the front) always at 0.2 of the way out and
-  // the ceiling ring (0.7) at 0.88, so the chart looks the same for either
-  // currency; a price past the scale runs along its edge. A side with no
-  // limit keeps its ring, faint.
+  // Price runs outward, the HOLD band opened wide: usually the floor ring
+  // sits 0.2 of the way out and the ceiling ring 0.88, so the chart looks the
+  // same for either currency. When the span's prices run past that scale it
+  // widens to take them all in and the rings move inward, so no part of the
+  // trace is pinned flat along an edge. A side with no limit keeps its ring,
+  // faint; with neither, the band is centred on the latest price.
   const { floor, ceiling } = limitsFor(pair);
-  const R = pos => R_IN + Math.min(0.98, Math.max(0.02, 0.2 + (pos - 0.3) * 1.7)) * (R_OUT - R_IN);
-  out.push(`<circle class="ring" cx="${C}" cy="${C}" r="${R(0.5)}"/>`);
-  for (const [side, v, pos] of [['floor', floor, 0.3], ['ceiling', ceiling, 0.7]]) {
-    out.push(`<circle class="limit ${side}${v == null ? ' unset' : ''}" cx="${C}" cy="${C}" r="${R(pos)}"/>`);
+  const prices = rows.map(r => r[col]);
+  const [lo, hi] = span(prices.at(-1) ?? 1, floor, ceiling), w = hi - lo;
+  let a = lo - 0.18 / 0.68 * w, b = hi + 0.10 / 0.68 * w; // the usual scale: 0.02 to 0.98 of the way out
+  if (prices.length) [a, b] = [Math.min(a, ...prices), Math.max(b, ...prices)];
+  const Rv = v => R_IN + (0.02 + 0.96 * (v - a) / (b - a)) * (R_OUT - R_IN);
+  out.push(`<circle class="ring" cx="${C}" cy="${C}" r="${Rv((lo + hi) / 2)}"/>`);
+  for (const [side, v, at] of [['floor', floor, lo], ['ceiling', ceiling, hi]]) {
+    out.push(`<circle class="limit ${side}${v == null ? ' unset' : ''}" cx="${C}" cy="${C}" r="${Rv(at)}"/>`);
   }
   // The seam at the top: the trace starts just right of it and ends at the
   // pen just left of it.
@@ -141,9 +146,6 @@ export function drawChart() {
   const spanName = days === 1 ? '24 HOURS' : `${days} DAYS`;
   let change = '—', since = '';
   if (rows.length) {
-    const prices = rows.map(r => r[col]);
-    const ref = prices.at(-1); // centres the scale when no limit is set
-    const Rv = v => R(position(v, floor, ceiling, ref));
     // Quotes close together are joined straight; after a longer pause the
     // pen holds the old price along its circle, then steps to the new one.
     let d = '';

@@ -42,7 +42,9 @@ CITIC publishes only its current quote: no history, no alerts. A Cron Trigger po
 **Alerts**
 - Each currency has an optional floor and ceiling, set on digit wheels and previewed on the dial before saving.
 - A wheel of currency codes in the sheet's title picks the currency, and a KNOB switch beside it puts that currency on the knob or takes it off. Alerts don't depend on the knob.
-- Per side, the alert state records the limit it fired for and the deepest step reached. Steps are fixed prices every 0.2% past the limit (floor 8.94: 8.9400, 8.9221, 8.9042, …). It sends on crossing the limit, again at once on passing each deeper step (one message, for the deepest, if several are passed between checks), every 4 h after the last message while the price stays outside, and re-arms only once the price is back inside by more than 0.1% (hysteresis).
+- Per side, the alert state records the limit it fired for and the deepest step reached. Steps are fixed prices every 0.2% past the limit (floor 8.94: 8.9400, 8.9221, 8.9042, …). It sends on crossing the limit, again at once on passing each deeper step (one message, for the deepest, if several are passed between checks), every 4 h after the last message while the price stays outside and has changed since it (no reminders of a frozen weekend quote), and re-arms only once the price is back inside by more than 0.1% (hysteresis).
+- Quiet hours: from 23:00 to 07:00 on the owner's clock, the check's messages are sent with Telegram's `disable_notification`, so they arrive without sound. The page reports its time zone (`tz` in KV) when it loads settings.
+- On CITIC's weekend (Saturday and Sunday in Beijing) an old quote is expected: the status line reads `WEEKEND · LAST QUOTE …` instead of the `NO NEW QUOTE SINCE …` warning.
 - A failed send is retried on the next check. After 3 failed checks in a row a "checks failing" message goes out, then a "recovered" one.
 
 <p align="center"><img src="docs/sheet.jpg" width="300" alt="The settings sheet open under the watch: a GBP currency wheel and a KNOB ON switch in its title, floor 8.9300 and ceiling 8.9800 on number wheels, each with an ON switch, and a Save button"></p>
@@ -63,6 +65,7 @@ Workers KV, binding `STORE`:
 | `limits` | `{ USD: { floor, ceiling }, GBP: …, … }` for the eight currencies | `PUT /api/settings` only |
 | `knob` | the knob's currencies in order, e.g. `["GBP", "USD"]` | `PUT /api/settings` only |
 | `site` | the site's address, for links in alerts, noted when the page loads or saves | `/api/settings` |
+| `tz` | the page's time zone, for quiet hours, written when it changes | `/api/settings` |
 | `data` | alert state, last check, failure count | the 10-minute check only |
 | `h:YYYY-MM-DD` | one Beijing day: `{ codes, rows }`, a row `[t, …sell, …buy]` per new quote for all 20 currencies, as quoted (per 100 units). ≤144 rows (~50 KB), TTL 92 days | the 10-minute check |
 | `r:YYYY-MM-DD` | the last row of each hour of a finished day, TTL 92 days | the 10-minute check, once a day |

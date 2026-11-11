@@ -7,6 +7,8 @@ import { drawChart, turned } from './back.js';
 const QUOTE_STALE_MIN = 60;  // CITIC normally re-quotes every few minutes
 const CHECK_STALE_MIN = 25;  // the alert check runs every 10 minutes
 const minutesAgo = ms => (Date.now() - ms) / 60000;
+const weekendInBeijing = () => [0, 6].includes(new Date(Date.now() + 8 * 3600_000).getUTCDay());
+const dayAndTime = d => `${['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()]} ${time(d)}`;
 
 // One line that says whether the prices and the alert check can be trusted.
 export function renderStatus() {
@@ -18,8 +20,14 @@ export function renderStatus() {
     level = 'error';
     text = lastGood ? `CITIC FEED ERROR · PRICES FROM ${time(new Date(lastGood))}` : 'CITIC FEED ERROR';
   } else if (quoteTime && minutesAgo(quoteTime) > QUOTE_STALE_MIN) {
-    level = 'warn';
-    text = `NO NEW QUOTE SINCE ${time(new Date(quoteTime))}`;
+    // CITIC barely re-quotes on its weekend (Saturday and Sunday in Beijing),
+    // so an old quote then is expected, not a fault.
+    if (weekendInBeijing()) {
+      text = `WEEKEND · LAST QUOTE ${dayAndTime(new Date(quoteTime))}`;
+    } else {
+      level = 'warn';
+      text = `NO NEW QUOTE SINCE ${time(new Date(quoteTime))}`;
+    }
   }
   if (!lastCheck) {
     if (level === 'ok') level = 'warn';
@@ -109,15 +117,19 @@ function drawScale(price, { floor, ceiling }) {
   }));
 }
 
-// A side that has alerted stays quiet until the price is back inside its
-// limit by the re-arm margin; say so, with the price that re-arms it. Not
-// while the sheet is open, since the draft limits are what's on show.
+// A side that has alerted says, as its Telegram message does, the price of
+// the next alert (the next step past the limit) and the price that re-arms
+// it. Not while the sheet is open, since the draft limits are what's on show.
 function alertNotes(p) {
   const sent = state.alerted?.[p], { floor, ceiling } = state.limits[p], k = state.rearm;
   if (!sent || state.draft) return [];
   const notes = [];
-  if (floor != null && (sent.floor === floor || sent.floor === true)) notes.push(`floor alerted · re-arms above ${(floor * (1 + k)).toFixed(4)}`);
-  if (ceiling != null && (sent.ceiling === ceiling || sent.ceiling === true)) notes.push(`ceiling alerted · re-arms below ${(ceiling * (1 - k)).toFixed(4)}`);
+  const next = (side, limit) => {
+    const n = state.steps?.[p]?.[side] || 1;
+    return (side === 'floor' ? limit * (1 - n * state.step) : limit * (1 + n * state.step)).toFixed(4);
+  };
+  if (floor != null && (sent.floor === floor || sent.floor === true)) notes.push(`next alert below ${next('floor', floor)} · re-arms above ${(floor * (1 + k)).toFixed(4)}`);
+  if (ceiling != null && (sent.ceiling === ceiling || sent.ceiling === true)) notes.push(`next alert above ${next('ceiling', ceiling)} · re-arms below ${(ceiling * (1 - k)).toFixed(4)}`);
   return notes;
 }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, CODES, PAIRS, fillLimits, TAPE_LENGTH, toRow, appendRow, normalizeDay, pairRows, hourly, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage, failingMessage, recoveredMessage, stepOf, stepAt } from '../src/logic.js';
+import { quietAt, validZone, parseCitic, CODES, PAIRS, fillLimits, TAPE_LENGTH, toRow, appendRow, normalizeDay, pairRows, hourly, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage, failingMessage, recoveredMessage, stepOf, stepAt } from '../src/logic.js';
 
 const none = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
 const limits = (gbp, usd = {}) => ({
@@ -52,19 +52,22 @@ test('repeats every 4 hours while the rate stays out, and says nothing coming ba
   const l = limits({ floor: 8.9 }), h = 3600_000;
   let r = evaluate({ GBP: 8.8 }, l, none, {}, 0);
   assert.equal(r.alerts.length, 1);
-  r = evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 3.9 * h, r.steps);
+  r = evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 3.9 * h, r.steps, r.sentRate);
   assert.equal(r.alerts.length, 0, 'not yet');
-  r = evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 4 * h, r.steps);
+  // Due, but the same price as the last message: nothing new to say.
+  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 4 * h, r.steps, r.sentRate).alerts.length, 0);
+  r = evaluate({ GBP: 8.801 }, l, r.alerted, r.sentAt, 4 * h, r.steps, r.sentRate);
   assert.deepEqual(r.alerts.map(a => a.repeat), [true]);
-  assert.match(alertMessage(r.alerts[0]), /still below your floor[\s\S]*every 4 hours/);
+  assert.match(alertMessage(r.alerts[0]), /still below your floor[\s\S]*every 4 hours while it stays below and the price moves/);
   // Four hours after that repeat, again.
-  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 7.9 * h, r.steps).alerts.length, 0);
-  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 8 * h, r.steps).alerts.length, 1);
+  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 7.9 * h, r.steps, r.sentRate).alerts.length, 0);
+  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 8 * h, r.steps, r.sentRate).alerts.length, 1);
   // Back inside: no message, and the clock is cleared.
-  const back = evaluate({ GBP: 9.0 }, l, r.alerted, r.sentAt, 9 * h, r.steps);
+  const back = evaluate({ GBP: 9.0 }, l, r.alerted, r.sentAt, 9 * h, r.steps, r.sentRate);
   assert.equal(back.alerts.length, 0);
   assert.equal(back.sentAt.GBP.floor, null);
   assert.equal(back.steps.GBP.floor, 0);
+  assert.equal(back.sentRate.GBP.floor, null);
 });
 
 test('a new limit alerts straight away, with no reset of the alert state', () => {
@@ -288,4 +291,29 @@ test('the step a rate is past, at and around each step price', () => {
   }
   // A glitch in the feed (a price 100 times too big) is worked out, not counted up to.
   assert.equal(stepOf('ceiling', 900, 9.0), 1 + Math.floor((900 - 9) / (9 * 0.002)));
+});
+
+// Last weekend, GBP every 10 minutes from Friday night (UTC), with a floor
+// just above it: the price barely moved, and every reminder repeated it.
+test('replay: a quiet weekend below the floor sends no reminder of the same price', () => {
+  const l = limits({ floor: 8.955 }), h = 3600_000;
+  let r = evaluate({ GBP: 8.9491 }, l, none, {}, 0);
+  const sent = [];
+  for (let t = 10 * 60_000; t <= 48 * h; t += 10 * 60_000) {
+    r = evaluate({ GBP: t < 47 * h ? 8.9491 : 8.9538 }, l, r.alerted, r.sentAt, t, r.steps, r.sentRate);
+    sent.push(...r.alerts.map(a => a.rate));
+  }
+  assert.deepEqual(sent, [8.9538]); // only once the price moved
+});
+
+test('quiet hours run 23:00 to 07:00 on the given clock, and need a known time zone', () => {
+  const at = iso => Date.parse(iso);
+  assert.equal(quietAt(at('2026-11-11T04:39Z'), 'Europe/London'), true);
+  assert.equal(quietAt(at('2026-11-11T07:00Z'), 'Europe/London'), false);
+  assert.equal(quietAt(at('2026-11-11T22:59Z'), 'Europe/London'), false);
+  assert.equal(quietAt(at('2026-11-11T23:00Z'), 'Europe/London'), true);
+  assert.equal(quietAt(at('2026-11-11T04:39Z'), 'Asia/Shanghai'), false); // 12:39 there
+  assert.equal(quietAt(at('2026-07-01T06:30Z'), 'Europe/London'), false); // 07:30 in summer time
+  assert.equal(quietAt(at('2026-11-11T04:39Z'), null), false);
+  assert.equal(validZone('Not/AZone'), false);
 });

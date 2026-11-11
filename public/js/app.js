@@ -27,8 +27,10 @@ async function loadRates() {
 }
 
 async function loadSettings() {
-  const { limits, knob = ['GBP', 'USD'], lastCheck, tape = [], alerted = null, rearm = 0.001, failing = null, alertError = null } = await getJSON('/api/settings');
-  Object.assign(state, { limits, knob, tape, lastCheck: lastCheck?.time ?? null, alerted, rearm, failing, alertError });
+  // The time zone goes along so the check knows when it's night here (quiet hours).
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { limits, knob = ['GBP', 'USD'], lastCheck, tape = [], alerted = null, steps = {}, rearm = 0.001, step = 0.002, failing = null, alertError = null } = await getJSON(`/api/settings?tz=${encodeURIComponent(tz)}`);
+  Object.assign(state, { limits, knob, tape, lastCheck: lastCheck?.time ?? null, alerted, steps, rearm, step, failing, alertError });
   // Outside the sheet the dial reads a currency on the knob.
   if (!state.draft && !knob.includes(state.pair)) state.pair = knob[0];
 }

@@ -30,7 +30,9 @@ export const state = {
   feedError: null, // message if the latest price load failed
   woundAt: 0,      // when the crown was last pressed (epoch ms)
   alerted: null,   // per currency and side: the limit an alert was sent for, or false
+  steps: {},       // per currency and side: the deepest alert step sent (1 is the limit)
   rearm: 0.001,    // how far back inside a limit a sent alert re-arms (from the Worker)
+  step: 0.002,     // how far apart the alert steps past a limit are (from the Worker)
   failing: null,   // { since, count, error } while the 10-minute check keeps failing
   alertError: null, // { time, error } if the last alert couldn't be sent
   offlineAt: null, // when the answers on show were saved, if they're the offline copy (sw.js)

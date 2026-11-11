@@ -187,7 +187,9 @@ export function stepOf(side, rate, limit) {
 // limit (below a floor, above a ceiling) and again, straight away, each
 // time it gets past a deeper step; a jump past several steps at once sends
 // one alert, for the deepest. While the rate stays out there it repeats
-// every REPEAT_MS from the last alert. It goes quiet once the rate is back
+// every REPEAT_MS from the last alert, if the price has changed since that
+// alert (CITIC barely re-quotes at weekends, and the same price again tells
+// nothing new). It goes quiet once the rate is back
 // inside the limit by more than REARM; coming back sends nothing, and the
 // steps already passed stay sent until then.
 //
@@ -195,17 +197,19 @@ export function stepOf(side, rate, limit) {
 // can alert straight away without anyone resetting it: saving settings
 // never has to touch the alert state, and the check never has to touch the
 // limits. (`true` is the old record, from before limits were kept.)
-// `sentAt` holds when each side last alerted, for the repeats, and `steps`
-// the deepest step it has alerted at (missing, from before steps: 1).
+// `sentAt` holds when each side last alerted and `sentRate` at what price,
+// for the repeats, and `steps` the deepest step it has alerted at (missing,
+// from before steps: 1).
 export const REPEAT_MS = 4 * 3600_000;
 
-export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now(), steps = {}) {
-  const next = {}, nextAt = {}, nextSteps = {};
+export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now(), steps = {}, sentRate = {}) {
+  const next = {}, nextAt = {}, nextSteps = {}, nextRate = {};
   const alerts = [];
   for (const pair of PAIRS) {
     next[pair] = { floor: false, ceiling: false, ...alerted[pair] };
     nextAt[pair] = { floor: null, ceiling: null, ...sentAt[pair] };
     nextSteps[pair] = Object.fromEntries(SIDES.map(side => [side, steps[pair]?.[side] ?? (next[pair][side] === false ? 0 : 1)]));
+    nextRate[pair] = { floor: null, ceiling: null, ...sentRate[pair] };
     const rate = rates[pair];
     // No quote this time (missing from the feed): keep the state as it was.
     if (!Number.isFinite(rate)) continue;
@@ -217,27 +221,31 @@ export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now(), 
         next[pair][side] = false;
         nextAt[pair][side] = null;
         nextSteps[pair][side] = 0;
+        nextRate[pair][side] = null;
       } else if (crossed(side, rate, limit)) {
         const step = stepOf(side, rate, limit);
         if (sent !== limit && sent !== true) {
           alerts.push({ pair, side, rate, limit, step, repeat: false, further: false });
           nextAt[pair][side] = now;
           nextSteps[pair][side] = step;
+          nextRate[pair][side] = rate;
         } else if (step > nextSteps[pair][side]) {
           alerts.push({ pair, side, rate, limit, step, repeat: false, further: true });
           nextAt[pair][side] = now;
           nextSteps[pair][side] = step;
+          nextRate[pair][side] = rate;
         } else if (at == null) {
           nextAt[pair][side] = now; // an old record with no time: start the clock
-        } else if (now - at >= REPEAT_MS) {
+        } else if (now - at >= REPEAT_MS && rate !== sentRate[pair]?.[side]) {
           alerts.push({ pair, side, rate, limit, step: nextSteps[pair][side], repeat: true, further: false });
           nextAt[pair][side] = now;
+          nextRate[pair][side] = rate;
         }
         next[pair][side] = limit;
       }
     }
   }
-  return { alerts, alerted: next, sentAt: nextAt, steps: nextSteps };
+  return { alerts, alerted: next, sentAt: nextAt, steps: nextSteps, sentRate: nextRate };
 }
 
 export function alertMessage({ pair, side, rate, limit, step = 1, repeat, further }, site) {
@@ -250,7 +258,7 @@ export function alertMessage({ pair, side, rate, limit, step = 1, repeat, furthe
     `${name}: ${limit.toFixed(4)}\n` +
     (step > 1 ? `Past step ${step}: ${stepAt(side, limit, step).toFixed(4)} (${sign}${((step - 1) * STEP * 100).toFixed(1)}%)\n` : '') +
     `Next alert ${where} ${stepAt(side, limit, step + 1).toFixed(4)}.\n` +
-    (repeat ? `A reminder every ${REPEAT_MS / 3600_000} hours while it stays ${where}.\n` : '') +
+    (repeat ? `A reminder every ${REPEAT_MS / 3600_000} hours while it stays ${where} and the price moves.\n` : '') +
     `Re-arms once back ${side === 'floor' ? 'above' : 'below'} ${rearmAt(side, limit).toFixed(4)}.` +
     (site ? `\n${site}` : '');
 }
@@ -268,6 +276,20 @@ export function testMessage(quotes, limits) {
   return `FX Watch test: notifications are working.\n` +
     `CITIC buy price now, in CNY, and alerts:\n${lines.join('\n')}\n` +
     `You'll get a message when a price crosses one of these.`;
+}
+
+// Quiet hours: from QUIET_FROM to QUIET_TO o'clock on the owner's clock
+// (the time zone their page reports), the check's messages arrive silently,
+// with no sound or buzz. Nothing is held back. With no time zone known yet,
+// nothing is silent.
+export const QUIET_FROM = 23, QUIET_TO = 7;
+export function validZone(tz) {
+  try { return typeof tz === 'string' && tz.length < 64 && !!new Intl.DateTimeFormat('en', { timeZone: tz }); } catch { return false; }
+}
+export function quietAt(ms, tz) {
+  if (!validZone(tz)) return false;
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: 'numeric', hourCycle: 'h23' }).format(ms));
+  return hour >= QUIET_FROM || hour < QUIET_TO;
 }
 
 // When the 10-minute check keeps failing, alerts can't fire, so say so once

@@ -268,3 +268,30 @@ test('limits kept inside the alert state, from before they had their own record,
   assert.equal(await run(env(store)), undefined);
   assert.deepEqual(store.json('limits').GBP, limits.GBP);
 });
+
+test('the page notes its time zone, and the check alerts silently in quiet hours', async (t) => {
+  const store = fakeKV({ limits });
+  const e = env(store);
+  const bodies = [];
+  globalThis.fetch = async (url, options) => {
+    if (String(url).includes('citicbank')) return new Response(citicFeed(8.91, 6.69));
+    bodies.push(JSON.parse(options.body));
+    return new Response('{}');
+  };
+  const get = tz => worker.fetch(new Request(`https://fx.example/api/settings?tz=${tz}`, { headers: { Authorization: 'Bearer pw' } }), e);
+  await get('Bad/Zone');
+  assert.equal(store.map.get('tz'), undefined);
+  await get('Europe/London');
+  assert.equal(store.map.get('tz'), 'Europe/London');
+  const writes = store.writes.length;
+  await get('Europe/London');
+  assert.equal(store.writes.length, writes, 'unchanged: not written again');
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-11-11T04:39:00Z') });
+  await run(e);
+  t.mock.timers.reset();
+  assert.equal(bodies.length, 1);
+  assert.equal(bodies[0].disable_notification, true);
+  const settings = await (await get('Europe/London')).json();
+  assert.equal(settings.steps.GBP.floor, 1);
+  assert.equal(settings.step, 0.002);
+});

@@ -1,4 +1,4 @@
-import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, FULL_DAYS, DAY_TTL, dayKey, rollupKey, toRow, normalizeDay, pairRows, hourly, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, validKnob, KNOB, migrate, fillLimits, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM } from './logic.js';
+import { PAIRS, SIDES, parseCitic, HISTORY_DAYS, FULL_DAYS, DAY_TTL, dayKey, rollupKey, toRow, normalizeDay, pairRows, hourly, appendRow, splitByDay, tapeFrom, daysBack, beijingDay, validLimit, validKnob, KNOB, migrate, fillLimits, evaluate, alertMessage, testMessage, FAIL_ALERT_AFTER, failingMessage, recoveredMessage, REARM, STEP, quietAt, validZone } from './logic.js';
 
 // The currencies on the knob ('knob'), written only when you save settings.
 async function readKnob(env) {
@@ -24,7 +24,7 @@ async function load(env) {
     const sent = old.alerted[p][side];
     return [side, sent === true ? old.limits[p][side] ?? false : sent];
   }))]));
-  return { lastCheck: old.lastCheck ?? null, alerted, limits: fillLimits(limits || old.limits), failing: data?.failing ?? null, alertError: data?.alertError ?? null, sentAt: data?.sentAt ?? {}, steps: data?.steps ?? {} };
+  return { lastCheck: old.lastCheck ?? null, alerted, limits: fillLimits(limits || old.limits), failing: data?.failing ?? null, alertError: data?.alertError ?? null, sentAt: data?.sentAt ?? {}, steps: data?.steps ?? {}, sentRate: data?.sentRate ?? {} };
 }
 
 // The same feed that powers the rate table on citicbank.com.
@@ -100,12 +100,12 @@ async function previousClose(env, before) {
   return null;
 }
 
-async function sendTelegram(env, text) {
+async function sendTelegram(env, text, silent = false) {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) throw new Error('TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set');
   const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text }),
+    body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, ...(silent && { disable_notification: true }) }),
   });
   if (!res.ok) throw new Error(`Telegram returned ${res.status}`);
 }
@@ -127,21 +127,23 @@ const json = (body, status = 200) => Response.json(body, { status, headers: { 'C
 // failures so that a check that keeps failing is reported (see logic.js).
 async function check(env) {
   const data = await load(env);
+  const silent = quietAt(Date.now(), await env.STORE.get('tz'));
   try {
     await splitOldHistory(env);
     const quotes = await fetchCitic();
     await record(env, quotes);
     await rollUp(env);
     const rates = Object.fromEntries(PAIRS.filter(p => quotes[p]).map(p => [p, quotes[p].price]));
-    const { alerts, alerted, sentAt, steps } = evaluate(rates, data.limits, data.alerted, data.sentAt, Date.now(), data.steps);
+    const { alerts, alerted, sentAt, steps, sentRate } = evaluate(rates, data.limits, data.alerted, data.sentAt, Date.now(), data.steps, data.sentRate);
     let alertError = alerts.length ? null : data.alertError;
     for (const alert of alerts) {
       try {
-        await sendTelegram(env, alertMessage(alert, await env.STORE.get('site')));
+        await sendTelegram(env, alertMessage(alert, await env.STORE.get('site')), silent);
       } catch (err) {
         // Retry on the next check: a first alert as if never sent, a
         // further step as if not yet reached, a repeat as if not yet due.
         const { pair, side } = alert;
+        sentRate[pair][side] = data.sentRate[pair]?.[side] ?? null;
         if (alert.repeat) sentAt[pair][side] = data.sentAt[pair]?.[side] ?? null;
         else if (alert.further) {
           steps[pair][side] = data.steps[pair]?.[side] ?? 1;
@@ -154,8 +156,8 @@ async function check(env) {
         console.error(err.message);
       }
     }
-    if (data.failing?.told) await sendTelegram(env, recoveredMessage(data.failing)).catch(err => console.error(err.message));
-    await env.STORE.put('data', JSON.stringify({ alerted, sentAt, steps, lastCheck: { time: Date.now(), rates }, alertError }));
+    if (data.failing?.told) await sendTelegram(env, recoveredMessage(data.failing), silent).catch(err => console.error(err.message));
+    await env.STORE.put('data', JSON.stringify({ alerted, sentAt, steps, sentRate, lastCheck: { time: Date.now(), rates }, alertError }));
   } catch (err) {
     const failing = {
       since: data.failing?.since ?? Date.now(),
@@ -164,9 +166,9 @@ async function check(env) {
       told: data.failing?.told ?? false,
     };
     if (failing.count >= FAIL_ALERT_AFTER && !failing.told) {
-      failing.told = await sendTelegram(env, failingMessage(failing, await env.STORE.get('site').catch(() => null))).then(() => true, () => false);
+      failing.told = await sendTelegram(env, failingMessage(failing, await env.STORE.get('site').catch(() => null)), silent).then(() => true, () => false);
     }
-    await env.STORE.put('data', JSON.stringify({ alerted: data.alerted, sentAt: data.sentAt, steps: data.steps, lastCheck: data.lastCheck, alertError: data.alertError, failing }));
+    await env.STORE.put('data', JSON.stringify({ alerted: data.alerted, sentAt: data.sentAt, steps: data.steps, sentRate: data.sentRate, lastCheck: data.lastCheck, alertError: data.alertError, failing }));
     throw err; // logged by Cloudflare as a failed run
   }
 }
@@ -209,10 +211,13 @@ async function api(request, env, path) {
     // The alert messages link to the site, and the 10-minute check has no
     // request to learn its address from, so it's noted here, by the owner's page.
     if (!(await env.STORE.get('site'))) await env.STORE.put('site', new URL(request.url).origin);
-    const [{ limits, lastCheck, alerted, failing, alertError }, rows, knob] = await Promise.all([load(env), recentRows(env, 12), readKnob(env)]);
+    // Likewise its time zone, for quiet hours (logic.js): written only when it changes.
+    const tz = new URL(request.url).searchParams.get('tz');
+    if (validZone(tz) && tz !== await env.STORE.get('tz')) await env.STORE.put('tz', tz);
+    const [{ limits, lastCheck, alerted, steps, failing, alertError }, rows, knob] = await Promise.all([load(env), recentRows(env, 12), readKnob(env)]);
     // Alert state too, so the page can say which alerts have fired and
     // when they re-arm, and whether checks or sends are failing.
-    return json({ limits, knob, lastCheck, tape: tapeFrom(rows), alerted, rearm: REARM, failing, alertError });
+    return json({ limits, knob, lastCheck, tape: tapeFrom(rows), alerted, steps, rearm: REARM, step: STEP, failing, alertError });
   }
 
   if (path === '/api/settings' && request.method === 'PUT') {

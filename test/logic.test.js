@@ -11,14 +11,14 @@ const limits = (gbp, usd = {}) => ({
 test('alerts once when a rate drops below its floor', () => {
   const first = evaluate({ GBP: 8.8, USD: 6.7 }, limits({ floor: 8.9 }), none);
   assert.deepEqual(first.alerts.map(a => [a.pair, a.side]), [['GBP', 'floor']]);
-  const second = evaluate({ GBP: 8.7, USD: 6.7 }, limits({ floor: 8.9 }), first.alerted);
+  const second = evaluate({ GBP: 8.8, USD: 6.7 }, limits({ floor: 8.9 }), first.alerted, first.sentAt, Date.now(), first.steps);
   assert.equal(second.alerts.length, 0);
 });
 
 test('alerts once when a rate rises above its ceiling', () => {
   const first = evaluate({ GBP: 9.1, USD: 6.7 }, limits({ ceiling: 9.0 }), none);
   assert.deepEqual(first.alerts.map(a => [a.pair, a.side]), [['GBP', 'ceiling']]);
-  assert.equal(evaluate({ GBP: 9.2 }, limits({ ceiling: 9.0 }), first.alerted).alerts.length, 0);
+  assert.equal(evaluate({ GBP: 9.1 }, limits({ ceiling: 9.0 }), first.alerted, first.sentAt, Date.now(), first.steps).alerts.length, 0);
 });
 
 test('re-arms only once the rate is back inside the limit by the margin', () => {
@@ -52,31 +52,32 @@ test('repeats every 4 hours while the rate stays out, and says nothing coming ba
   const l = limits({ floor: 8.9 }), h = 3600_000;
   let r = evaluate({ GBP: 8.8 }, l, none, {}, 0);
   assert.equal(r.alerts.length, 1);
-  r = evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 3.9 * h);
+  r = evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 3.9 * h, r.steps);
   assert.equal(r.alerts.length, 0, 'not yet');
-  r = evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 4 * h);
+  r = evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 4 * h, r.steps);
   assert.deepEqual(r.alerts.map(a => a.repeat), [true]);
   assert.match(alertMessage(r.alerts[0]), /still below your floor[\s\S]*every 4 hours/);
   // Four hours after that repeat, again.
-  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 7.9 * h).alerts.length, 0);
-  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 8 * h).alerts.length, 1);
+  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 7.9 * h, r.steps).alerts.length, 0);
+  assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 8 * h, r.steps).alerts.length, 1);
   // Back inside: no message, and the clock is cleared.
-  const back = evaluate({ GBP: 9.0 }, l, r.alerted, r.sentAt, 9 * h);
+  const back = evaluate({ GBP: 9.0 }, l, r.alerted, r.sentAt, 9 * h, r.steps);
   assert.equal(back.alerts.length, 0);
   assert.equal(back.sentAt.GBP.floor, null);
+  assert.equal(back.steps.GBP.floor, 0);
 });
 
 test('a new limit alerts straight away, with no reset of the alert state', () => {
   const first = evaluate({ GBP: 8.8 }, limits({ floor: 8.9 }), none);
   assert.equal(first.alerted.GBP.floor, 8.9);
   // Still below the same floor: quiet.
-  assert.equal(evaluate({ GBP: 8.7 }, limits({ floor: 8.9 }), first.alerted).alerts.length, 0);
+  assert.equal(evaluate({ GBP: 8.8 }, limits({ floor: 8.9 }), first.alerted, first.sentAt, Date.now(), first.steps).alerts.length, 0);
   // Floor moved and the price is still below it: alerts for the new floor.
   const moved = evaluate({ GBP: 8.7 }, limits({ floor: 8.85 }), first.alerted);
   assert.deepEqual(moved.alerts.map(a => a.limit), [8.85]);
   // An alert state saved before limits were recorded (true) stays quiet.
   const old = { GBP: { floor: true, ceiling: false }, USD: { floor: false, ceiling: false } };
-  assert.equal(evaluate({ GBP: 8.7 }, limits({ floor: 8.9 }), old).alerts.length, 0);
+  assert.equal(evaluate({ GBP: 8.895 }, limits({ floor: 8.9 }), old).alerts.length, 0);
 });
 
 test('migrates settings saved before ceilings existed', () => {
@@ -198,11 +199,11 @@ test('failure and recovery messages say how long alerts were off', () => {
 
 test('a currency missing from one check keeps its alert state', () => {
   const first = evaluate({ GBP: 8.8, USD: 6.7 }, limits({ floor: 8.9 }), none);
-  const gap = evaluate({ USD: 6.7 }, limits({ floor: 8.9 }), first.alerted, first.sentAt);
+  const gap = evaluate({ USD: 6.7 }, limits({ floor: 8.9 }), first.alerted, first.sentAt, Date.now(), first.steps);
   assert.equal(gap.alerts.length, 0);
   assert.equal(gap.alerted.GBP.floor, 8.9);
   // Back, still below: no second alert, as if it had never gone.
-  assert.equal(evaluate({ GBP: 8.8, USD: 6.7 }, limits({ floor: 8.9 }), gap.alerted, gap.sentAt).alerts.length, 0);
+  assert.equal(evaluate({ GBP: 8.8, USD: 6.7 }, limits({ floor: 8.9 }), gap.alerted, gap.sentAt, Date.now(), gap.steps).alerts.length, 0);
 });
 
 test('yen is quoted and alerted per 100', () => {
@@ -212,4 +213,64 @@ test('yen is quoted and alerted per 100', () => {
   assert.equal(parseCitic(feed).JPY.price, 4.2364);
   assert.match(alertMessage({ pair: 'JPY', side: 'floor', rate: 4.2, limit: 4.25 }), /100 JPY = 4\.2000 CNY/);
   assert.match(alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }), /: 1 GBP = 8\.8000 CNY/);
+});
+
+test('past the limit, each deeper 0.2% step alerts once, straight away', () => {
+  const l = limits({ floor: 8.94 });
+  // Steps of a floor at 8.94: 8.9400, 8.9221, 8.9042, ...
+  let r = evaluate({ GBP: 8.939 }, l, none, {}, 0);
+  assert.deepEqual(r.alerts.map(a => [a.step, a.further]), [[1, false]]);
+  // Back up a little (not re-armed) and down again: nothing new.
+  for (const rate of [8.941, 8.938, 8.93, 8.9222]) {
+    r = evaluate({ GBP: rate }, l, r.alerted, r.sentAt, 3600_000, r.steps);
+    assert.equal(r.alerts.length, 0, String(rate));
+  }
+  // Past 8.9221: the second step, without waiting for the 4-hour repeat.
+  r = evaluate({ GBP: 8.922 }, l, r.alerted, r.sentAt, 2 * 3600_000, r.steps);
+  assert.deepEqual(r.alerts.map(a => [a.step, a.further]), [[2, true]]);
+  assert.match(alertMessage(r.alerts[0]), /GBP fell further below your floor[\s\S]*Past step 2: 8\.9221 \(−0\.2%\)[\s\S]*Next alert below 8\.9042\./);
+  // The repeat clock restarts from that alert.
+  assert.equal(evaluate({ GBP: 8.922 }, l, r.alerted, r.sentAt, 5.9 * 3600_000, r.steps).alerts.length, 0);
+  assert.deepEqual(evaluate({ GBP: 8.922 }, l, r.alerted, r.sentAt, 6 * 3600_000, r.steps).alerts.map(a => [a.step, a.repeat]), [[2, true]]);
+  // A jump past several steps sends one alert, for the deepest.
+  const jump = evaluate({ GBP: 8.88 }, l, r.alerted, r.sentAt, 3 * 3600_000, r.steps);
+  assert.deepEqual(jump.alerts.map(a => a.step), [4]);
+  // Re-armed, the steps start again from the limit.
+  const back = evaluate({ GBP: 8.96 }, l, jump.alerted, jump.sentAt, 4 * 3600_000, jump.steps);
+  assert.equal(back.steps.GBP.floor, 0);
+  assert.deepEqual(evaluate({ GBP: 8.939 }, l, back.alerted, back.sentAt, 5 * 3600_000, back.steps).alerts.map(a => a.step), [1]);
+});
+
+test('a ceiling steps up the same way', () => {
+  const l = limits({ ceiling: 9.0 });
+  let r = evaluate({ GBP: 9.001 }, l, none, {}, 0);
+  r = evaluate({ GBP: 9.017 }, l, r.alerted, r.sentAt, 1, r.steps);
+  assert.equal(r.alerts.length, 0);
+  r = evaluate({ GBP: 9.0185 }, l, r.alerted, r.sentAt, 2, r.steps);
+  assert.deepEqual(r.alerts.map(a => [a.step, a.further]), [[2, true]]);
+  assert.match(alertMessage(r.alerts[0]), /GBP rose further above your ceiling[\s\S]*\(\+0\.2%\)[\s\S]*Next alert above 9\.0360\./);
+});
+
+test('an alert state from before steps counts as the first step', () => {
+  const sent = { GBP: { floor: 8.94, ceiling: false }, USD: { floor: false, ceiling: false } };
+  const l = limits({ floor: 8.94 });
+  assert.equal(evaluate({ GBP: 8.93 }, l, sent, { GBP: { floor: 0 } }, 1).alerts.length, 0);
+  assert.deepEqual(evaluate({ GBP: 8.92 }, l, sent, { GBP: { floor: 0 } }, 1).alerts.map(a => a.step), [2]);
+});
+
+// The night of 10–11 Nov 2026, GBP every 20 minutes (UTC), floor 8.94: it
+// alerted at 04:39, wobbled back over the floor without re-arming and fell
+// on, and the next message waited for the 4-hour repeat at 08:49. Now the
+// fall past 8.9221 alerts when it happens.
+test('replay: 11 Nov 2026, the fall after the floor alert is told at once', () => {
+  const night = [['04:09', 8.9411], ['04:39', 8.9398], ['05:09', 8.9438], ['05:49', 8.9403], ['06:09', 8.9383], ['06:29', 8.9358],
+    ['06:49', 8.9326], ['07:09', 8.9375], ['07:29', 8.932], ['07:49', 8.9238], ['08:09', 8.9239], ['08:29', 8.9163], ['08:49', 8.9163]];
+  const l = limits({ floor: 8.94 });
+  let r = { alerted: none, sentAt: {}, steps: {} };
+  const sent = [];
+  for (const [hhmm, rate] of night) {
+    r = evaluate({ GBP: rate }, l, r.alerted, r.sentAt, Date.parse(`2026-11-11T${hhmm}:00Z`), r.steps);
+    sent.push(...r.alerts.map(a => `${hhmm} step ${a.step}${a.repeat ? ' repeat' : ''}`));
+  }
+  assert.deepEqual(sent, ['04:39 step 1', '08:29 step 2']);
 });

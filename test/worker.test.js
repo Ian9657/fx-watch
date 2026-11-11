@@ -238,3 +238,26 @@ test('a check carries on when a currency is missing, and fails when all are', as
   network(() => 'cb({"content":{"resultList":[]}})');
   assert.match((await run(env(store))).message, /No CITIC price/);
 });
+
+test('a deeper step that Telegram fails to send is sent on the next check', async () => {
+  const store = fakeKV({ limits });
+  const e = env(store);
+  let gbp = 8.919, telegramUp = true;
+  const sent = [];
+  globalThis.fetch = async (url, options) => {
+    if (String(url).includes('citicbank')) return new Response(citicFeed(gbp, 6.69));
+    if (!telegramUp) return new Response('down', { status: 502 });
+    sent.push(JSON.parse(options.body).text);
+    return new Response('{}');
+  };
+  await run(e); // past the floor 8.92: step 1
+  assert.equal(store.json('data').steps.GBP.floor, 1);
+  gbp = 8.9; telegramUp = false; // past 8.9022: step 2, not delivered
+  await run(e);
+  assert.equal(store.json('data').steps.GBP.floor, 1);
+  telegramUp = true;
+  await run(e);
+  assert.equal(sent.length, 2);
+  assert.match(sent[1], /GBP fell further below your floor[\s\S]*Past step 2: 8\.9022/);
+  assert.equal(store.json('data').steps.GBP.floor, 2);
+});

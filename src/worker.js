@@ -25,7 +25,7 @@ async function load(env) {
     const sent = old.alerted[p][side];
     return [side, sent === true ? old.limits[p][side] ?? false : sent];
   }))]));
-  return { lastCheck: old.lastCheck ?? null, alerted, limits: fillLimits(limits || old.limits), failing: data?.failing ?? null, alertError: data?.alertError ?? null, sentAt: data?.sentAt ?? {} };
+  return { lastCheck: old.lastCheck ?? null, alerted, limits: fillLimits(limits || old.limits), failing: data?.failing ?? null, alertError: data?.alertError ?? null, sentAt: data?.sentAt ?? {}, steps: data?.steps ?? {} };
 }
 
 // The same feed that powers the rate table on citicbank.com.
@@ -134,22 +134,29 @@ async function check(env) {
     await record(env, quotes);
     await rollUp(env);
     const rates = Object.fromEntries(PAIRS.filter(p => quotes[p]).map(p => [p, quotes[p].price]));
-    const { alerts, alerted, sentAt } = evaluate(rates, data.limits, data.alerted, data.sentAt);
+    const { alerts, alerted, sentAt, steps } = evaluate(rates, data.limits, data.alerted, data.sentAt, Date.now(), data.steps);
     let alertError = alerts.length ? null : data.alertError;
     for (const alert of alerts) {
       try {
         await sendTelegram(env, alertMessage(alert, await env.STORE.get('site')));
       } catch (err) {
-        // Retry on the next check: a first alert as if never sent, a repeat
-        // as if not yet due.
-        if (alert.repeat) sentAt[alert.pair][alert.side] = data.sentAt[alert.pair]?.[alert.side] ?? null;
-        else alerted[alert.pair][alert.side] = false;
+        // Retry on the next check: a first alert as if never sent, a
+        // further step as if not yet reached, a repeat as if not yet due.
+        const { pair, side } = alert;
+        if (alert.repeat) sentAt[pair][side] = data.sentAt[pair]?.[side] ?? null;
+        else if (alert.further) {
+          steps[pair][side] = data.steps[pair]?.[side] ?? 1;
+          sentAt[pair][side] = data.sentAt[pair]?.[side] ?? null;
+        } else {
+          alerted[pair][side] = false;
+          steps[pair][side] = 0;
+        }
         alertError = { time: Date.now(), error: err.message };
         console.error(err.message);
       }
     }
     if (data.failing?.told) await sendTelegram(env, recoveredMessage(data.failing)).catch(err => console.error(err.message));
-    await env.STORE.put('data', JSON.stringify({ alerted, sentAt, lastCheck: { time: Date.now(), rates }, alertError }));
+    await env.STORE.put('data', JSON.stringify({ alerted, sentAt, steps, lastCheck: { time: Date.now(), rates }, alertError }));
   } catch (err) {
     const failing = {
       since: data.failing?.since ?? Date.now(),
@@ -160,7 +167,7 @@ async function check(env) {
     if (failing.count >= FAIL_ALERT_AFTER && !failing.told) {
       failing.told = await sendTelegram(env, failingMessage(failing, await env.STORE.get('site').catch(() => null))).then(() => true, () => false);
     }
-    await env.STORE.put('data', JSON.stringify({ alerted: data.alerted, sentAt: data.sentAt, lastCheck: data.lastCheck, alertError: data.alertError, failing }));
+    await env.STORE.put('data', JSON.stringify({ alerted: data.alerted, sentAt: data.sentAt, steps: data.steps, lastCheck: data.lastCheck, alertError: data.alertError, failing }));
     throw err; // logged by Cloudflare as a failed run
   }
 }

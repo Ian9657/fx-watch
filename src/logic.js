@@ -164,24 +164,45 @@ export const rearmAt = (side, limit) => side === 'floor' ? limit * (1 + REARM) :
 const rearmed = (side, rate, limit) =>
   side === 'floor' ? rate > rearmAt(side, limit) : rate < rearmAt(side, limit);
 
+// Past a limit, the alert steps further every STEP of it: steps at the
+// limit, then 0.2%, 0.4%, ... beyond (for a floor of 8.94: 8.9400, 8.9221,
+// 8.9042, ...). Fixed prices, known ahead, so a price wobbling about one of
+// them alerts at it once, like the limit itself.
+export const STEP = 0.002;
+
+// The price of a side's nth step (1 is the limit itself).
+export const stepAt = (side, limit, n) => side === 'floor' ? limit * (1 - (n - 1) * STEP) : limit * (1 + (n - 1) * STEP);
+
+// The deepest step the rate is past (0 when it isn't past the limit).
+export function stepOf(side, rate, limit) {
+  let n = 0;
+  while (crossed(side, rate, stepAt(side, limit, n + 1))) n++;
+  return n;
+}
+
 // Decide which alerts to send. Each side alerts when the rate crosses its
-// limit (below a floor, above a ceiling), then again every REPEAT_MS while
-// it stays out there, and goes quiet once the rate is back inside the limit
-// by more than REARM. Coming back inside sends nothing.
+// limit (below a floor, above a ceiling) and again, straight away, each
+// time it gets past a deeper step; a jump past several steps at once sends
+// one alert, for the deepest. While the rate stays out there it repeats
+// every REPEAT_MS from the last alert. It goes quiet once the rate is back
+// inside the limit by more than REARM; coming back sends nothing, and the
+// steps already passed stay sent until then.
 //
 // A side that has alerted records the limit it alerted for, so a new limit
 // can alert straight away without anyone resetting it: saving settings
 // never has to touch the alert state, and the check never has to touch the
 // limits. (`true` is the old record, from before limits were kept.)
-// `sentAt` holds when each side last alerted, for the repeats.
+// `sentAt` holds when each side last alerted, for the repeats, and `steps`
+// the deepest step it has alerted at (missing, from before steps: 1).
 export const REPEAT_MS = 4 * 3600_000;
 
-export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now()) {
-  const next = {}, nextAt = {};
+export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now(), steps = {}) {
+  const next = {}, nextAt = {}, nextSteps = {};
   const alerts = [];
   for (const pair of PAIRS) {
     next[pair] = { floor: false, ceiling: false, ...alerted[pair] };
     nextAt[pair] = { floor: null, ceiling: null, ...sentAt[pair] };
+    nextSteps[pair] = Object.fromEntries(SIDES.map(side => [side, steps[pair]?.[side] ?? (next[pair][side] === false ? 0 : 1)]));
     const rate = rates[pair];
     // No quote this time (missing from the feed): keep the state as it was.
     if (!Number.isFinite(rate)) continue;
@@ -192,29 +213,40 @@ export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now()) 
       if (limit == null || (!crossed(side, rate, limit) && rearmed(side, rate, limit))) {
         next[pair][side] = false;
         nextAt[pair][side] = null;
+        nextSteps[pair][side] = 0;
       } else if (crossed(side, rate, limit)) {
+        const step = stepOf(side, rate, limit);
         if (sent !== limit && sent !== true) {
-          alerts.push({ pair, side, rate, limit, repeat: false });
+          alerts.push({ pair, side, rate, limit, step, repeat: false, further: false });
           nextAt[pair][side] = now;
+          nextSteps[pair][side] = step;
+        } else if (step > nextSteps[pair][side]) {
+          alerts.push({ pair, side, rate, limit, step, repeat: false, further: true });
+          nextAt[pair][side] = now;
+          nextSteps[pair][side] = step;
         } else if (at == null) {
           nextAt[pair][side] = now; // an old record with no time: start the clock
         } else if (now - at >= REPEAT_MS) {
-          alerts.push({ pair, side, rate, limit, repeat: true });
+          alerts.push({ pair, side, rate, limit, step: nextSteps[pair][side], repeat: true, further: false });
           nextAt[pair][side] = now;
         }
         next[pair][side] = limit;
       }
     }
   }
-  return { alerts, alerted: next, sentAt: nextAt };
+  return { alerts, alerted: next, sentAt: nextAt, steps: nextSteps };
 }
 
-export function alertMessage({ pair, side, rate, limit, repeat }, site) {
+export function alertMessage({ pair, side, rate, limit, step = 1, repeat, further }, site) {
   const name = side === 'floor' ? 'Floor' : 'Ceiling';
   const where = side === 'floor' ? 'below' : 'above';
-  return `${pair} is ${repeat ? 'still ' : ''}${where} your ${side}\n` +
+  const sign = side === 'floor' ? '−' : '+';
+  const title = further ? `${pair} ${side === 'floor' ? 'fell' : 'rose'} further ${where} your ${side}` : `${pair} is ${repeat ? 'still ' : ''}${where} your ${side}`;
+  return `${title}\n` +
     `CITIC buy price: ${unit(pair)} ${pair} = ${rate.toFixed(4)} CNY\n` +
     `${name}: ${limit.toFixed(4)}\n` +
+    (step > 1 ? `Past step ${step}: ${stepAt(side, limit, step).toFixed(4)} (${sign}${((step - 1) * STEP * 100).toFixed(1)}%)\n` : '') +
+    `Next alert ${where} ${stepAt(side, limit, step + 1).toFixed(4)}.\n` +
     (repeat ? `A reminder every ${REPEAT_MS / 3600_000} hours while it stays ${where}.\n` : '') +
     `Re-arms once back ${side === 'floor' ? 'above' : 'below'} ${rearmAt(side, limit).toFixed(4)}.` +
     (site ? `\n${site}` : '');

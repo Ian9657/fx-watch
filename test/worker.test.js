@@ -261,3 +261,10 @@ test('a deeper step that Telegram fails to send is sent on the next check', asyn
   assert.match(sent[1], /GBP fell further below your floor[\s\S]*Past step 2: 8\.9022/);
   assert.equal(store.json('data').steps.GBP.floor, 2);
 });
+
+test('limits kept inside the alert state, from before they had their own record, are moved out by a check', async () => {
+  const store = fakeKV({ data: { limits, alerted: { GBP: { floor: false, ceiling: false } } } });
+  network(() => citicFeed(8.95, 6.69));
+  assert.equal(await run(env(store)), undefined);
+  assert.deepEqual(store.json('limits').GBP, limits.GBP);
+});

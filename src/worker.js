@@ -17,7 +17,6 @@ async function load(env) {
   if (!limits && data?.limits) {
     limits = old.limits;
     await env.STORE.put('limits', JSON.stringify(limits));
-    await env.STORE.put('site', new URL(request.url).origin); // in case it has moved
   }
   // Alert state from before the split says only true, not which limit it was
   // for; that was the limit saved alongside it.

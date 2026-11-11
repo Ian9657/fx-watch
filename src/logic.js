@@ -175,7 +175,10 @@ export const stepAt = (side, limit, n) => side === 'floor' ? limit * (1 - (n - 1
 
 // The deepest step the rate is past (0 when it isn't past the limit).
 export function stepOf(side, rate, limit) {
-  let n = 0;
+  if (!crossed(side, rate, limit)) return 0;
+  // Worked out, then nudged past float rounding at a step's exact price.
+  let n = 1 + Math.floor(Math.abs(rate - limit) / (limit * STEP));
+  while (n > 1 && !crossed(side, rate, stepAt(side, limit, n))) n--;
   while (crossed(side, rate, stepAt(side, limit, n + 1))) n++;
   return n;
 }

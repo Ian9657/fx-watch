@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCitic, CODES, PAIRS, fillLimits, TAPE_LENGTH, toRow, appendRow, normalizeDay, pairRows, hourly, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage, failingMessage, recoveredMessage } from '../src/logic.js';
+import { parseCitic, CODES, PAIRS, fillLimits, TAPE_LENGTH, toRow, appendRow, normalizeDay, pairRows, hourly, splitByDay, tapeFrom, daysBack, beijingDay, evaluate, validLimit, migrate, alertMessage, testMessage, failingMessage, recoveredMessage, stepOf, stepAt } from '../src/logic.js';
 
 const none = { GBP: { floor: false, ceiling: false }, USD: { floor: false, ceiling: false } };
 const limits = (gbp, usd = {}) => ({
@@ -273,4 +273,19 @@ test('replay: 11 Nov 2026, the fall after the floor alert is told at once', () =
     sent.push(...r.alerts.map(a => `${hhmm} step ${a.step}${a.repeat ? ' repeat' : ''}`));
   }
   assert.deepEqual(sent, ['04:39 step 1', '08:29 step 2']);
+});
+
+test('the step a rate is past, at and around each step price', () => {
+  assert.equal(stepOf('floor', 8.95, 8.94), 0);
+  assert.equal(stepOf('floor', 8.94, 8.94), 0);
+  for (let n = 1; n <= 30; n++) {
+    const at = stepAt('floor', 8.94, n);
+    assert.equal(stepOf('floor', at, 8.94), n - 1, `on step ${n}`);
+    assert.equal(stepOf('floor', at - 1e-9, 8.94), n, `just past step ${n}`);
+    const up = stepAt('ceiling', 9.0, n);
+    assert.equal(stepOf('ceiling', up, 9.0), n - 1);
+    assert.equal(stepOf('ceiling', up + 1e-9, 9.0), n);
+  }
+  // A glitch in the feed (a price 100 times too big) is worked out, not counted up to.
+  assert.equal(stepOf('ceiling', 900, 9.0), 1 + Math.floor((900 - 9) / (9 * 0.002)));
 });

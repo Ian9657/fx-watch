@@ -248,18 +248,18 @@ export function evaluate(rates, limits, alerted, sentAt = {}, now = Date.now(), 
   return { alerts, alerted: next, sentAt: nextAt, steps: nextSteps, sentRate: nextRate };
 }
 
-export function alertMessage({ pair, side, rate, limit, step = 1, repeat, further }, site) {
-  const name = side === 'floor' ? 'Floor' : 'Ceiling';
-  const where = side === 'floor' ? 'below' : 'above';
+// Three lines, the same for every alert: the price and what happened (all
+// a phone's notification shows), the next alert's price and the one that
+// resets the side (as the dial says), and the site.
+const label = pair => unit(pair) === 1 ? pair : `${unit(pair)} ${pair}`;
+export function alertMessage({ pair, side, rate, limit, step = 1, repeat }, site) {
+  const where = side === 'floor' ? 'below' : 'above', back = side === 'floor' ? 'above' : 'below';
   const sign = side === 'floor' ? '−' : '+';
-  const title = further ? `${pair} ${side === 'floor' ? 'fell' : 'rose'} further ${where} your ${side}` : `${pair} is ${repeat ? 'still ' : ''}${where} your ${side}`;
-  return `${title}\n` +
-    `CITIC buy price: ${unit(pair)} ${pair} = ${rate.toFixed(4)} CNY\n` +
-    `${name}: ${limit.toFixed(4)}\n` +
-    (step > 1 ? `Past step ${step}: ${stepAt(side, limit, step).toFixed(4)} (${sign}${((step - 1) * STEP * 100).toFixed(1)}%)\n` : '') +
-    `Next alert ${where} ${stepAt(side, limit, step + 1).toFixed(4)}.\n` +
-    (repeat ? `A reminder every ${REPEAT_MS / 3600_000} hours while it stays ${where} and the price moves.\n` : '') +
-    `Re-arms once back ${side === 'floor' ? 'above' : 'below'} ${rearmAt(side, limit).toFixed(4)}.` +
+  const what = repeat ? `still ${where} ${side} ${limit.toFixed(4)}`
+    : step > 1 ? `past ${stepAt(side, limit, step).toFixed(4)} (${side} ${sign}${((step - 1) * STEP * 100).toFixed(1)}%)`
+    : `${where} ${side} ${limit.toFixed(4)}`;
+  return `${label(pair)} ${rate.toFixed(4)} · ${what}\n` +
+    `Next alert ${where} ${stepAt(side, limit, step + 1).toFixed(4)} · resets ${back} ${rearmAt(side, limit).toFixed(4)}` +
     (site ? `\n${site}` : '');
 }
 
@@ -272,10 +272,8 @@ function describeLimits({ floor, ceiling } = {}) {
 
 // Confirms delivery only; says nothing about whether a limit was crossed.
 export function testMessage(quotes, limits) {
-  const lines = PAIRS.filter(p => quotes[p]).map(p => `${unit(p) === 1 ? '' : `${unit(p)} `}${p} ${quotes[p].price.toFixed(4)} · ${describeLimits(limits[p])}`);
-  return `FX Watch test: notifications are working.\n` +
-    `CITIC buy price now, in CNY, and alerts:\n${lines.join('\n')}\n` +
-    `You'll get a message when a price crosses one of these.`;
+  const lines = PAIRS.filter(p => quotes[p]).map(p => `${label(p)} ${quotes[p].price.toFixed(4)} · ${describeLimits(limits[p])}`);
+  return `Test · notifications are working\n${lines.join('\n')}`;
 }
 
 // Quiet hours: from QUIET_FROM to QUIET_TO o'clock on the owner's clock
@@ -298,12 +296,11 @@ export function quietAt(ms, tz) {
 export const FAIL_ALERT_AFTER = 3;
 
 export function failingMessage({ count, error }, site) {
-  return `FX Watch: the price check has failed ${count} times in a row (about ${count * 10} minutes).\n` +
-    `Floor and ceiling alerts are paused until it works again.\n` +
-    `Last error: ${error}` +
+  return `Price check failing · ${count} in a row (about ${count * 10} min)\n` +
+    `Alerts paused · last error: ${error}` +
     (site ? `\n${site}` : '');
 }
 
 export function recoveredMessage({ count }) {
-  return `FX Watch: the price check is working again after ${count} failed checks (about ${count * 10} minutes). Alerts are back on.`;
+  return `Price check working again · after ${count} failures (about ${count * 10} min)\nAlerts back on`;
 }

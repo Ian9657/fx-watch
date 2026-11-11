@@ -118,7 +118,7 @@ function drawScale(price, { floor, ceiling }) {
 }
 
 // A side that has alerted says, as its Telegram message does, the price of
-// the next alert (the next step past the limit) and the price that re-arms
+// the next alert (the next step past the limit) and the price that resets
 // it. Not while the sheet is open, since the draft limits are what's on show.
 function alertNotes(p) {
   const sent = state.alerted?.[p], { floor, ceiling } = state.limits[p], k = state.rearm;
@@ -128,8 +128,8 @@ function alertNotes(p) {
     const n = state.steps?.[p]?.[side] || 1;
     return (side === 'floor' ? limit * (1 - n * state.step) : limit * (1 + n * state.step)).toFixed(4);
   };
-  if (floor != null && (sent.floor === floor || sent.floor === true)) notes.push(`next alert below ${next('floor', floor)} · re-arms above ${(floor * (1 + k)).toFixed(4)}`);
-  if (ceiling != null && (sent.ceiling === ceiling || sent.ceiling === true)) notes.push(`next alert above ${next('ceiling', ceiling)} · re-arms below ${(ceiling * (1 - k)).toFixed(4)}`);
+  if (floor != null && (sent.floor === floor || sent.floor === true)) notes.push(`next alert below ${next('floor', floor)} · resets above ${(floor * (1 + k)).toFixed(4)}`);
+  if (ceiling != null && (sent.ceiling === ceiling || sent.ceiling === true)) notes.push(`next alert above ${next('ceiling', ceiling)} · resets below ${(ceiling * (1 - k)).toFixed(4)}`);
   return notes;
 }
 

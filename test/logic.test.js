@@ -58,7 +58,7 @@ test('repeats every 4 hours while the rate stays out, and says nothing coming ba
   assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 4 * h, r.steps, r.sentRate).alerts.length, 0);
   r = evaluate({ GBP: 8.801 }, l, r.alerted, r.sentAt, 4 * h, r.steps, r.sentRate);
   assert.deepEqual(r.alerts.map(a => a.repeat), [true]);
-  assert.match(alertMessage(r.alerts[0]), /still below your floor[\s\S]*every 4 hours while it stays below and the price moves/);
+  assert.match(alertMessage(r.alerts[0]), /^GBP 8\.8010 · still below floor 8\.9000\n/);
   // Four hours after that repeat, again.
   assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 7.9 * h, r.steps, r.sentRate).alerts.length, 0);
   assert.equal(evaluate({ GBP: 8.8 }, l, r.alerted, r.sentAt, 8 * h, r.steps, r.sentRate).alerts.length, 1);
@@ -96,11 +96,11 @@ test('migrates settings saved before ceilings existed', () => {
 });
 
 test('alert message names the side that was crossed', () => {
-  assert.match(alertMessage({ pair: 'GBP', side: 'ceiling', rate: 9.05, limit: 9 }), /GBP is above your ceiling[\s\S]*Ceiling: 9\.0000/);
-  assert.match(alertMessage({ pair: 'USD', side: 'floor', rate: 6.6, limit: 6.65 }), /USD is below your floor[\s\S]*Floor: 6\.6500/);
+  assert.match(alertMessage({ pair: 'GBP', side: 'ceiling', rate: 9.05, limit: 9 }), /^GBP 9\.0500 · above ceiling 9\.0000\n/);
+  assert.match(alertMessage({ pair: 'USD', side: 'floor', rate: 6.6, limit: 6.65 }), /^USD 6\.6000 · below floor 6\.6500\n/);
   // Where it re-arms, 0.1% back inside the limit.
-  assert.match(alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }), /Re-arms once back above 8\.9089\./);
-  assert.match(alertMessage({ pair: 'GBP', side: 'ceiling', rate: 9.05, limit: 9 }), /Re-arms once back below 8\.9910\./);
+  assert.match(alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }), /\nNext alert below 8\.8822 · resets above 8\.9089$/);
+  assert.match(alertMessage({ pair: 'GBP', side: 'ceiling', rate: 9.05, limit: 9 }), /\nNext alert above 9\.0180 · resets below 8\.9910$/);
 });
 
 test('parses the CITIC rate feed', () => {
@@ -133,8 +133,7 @@ test('validates limits', () => {
 
 test('test message does not claim a limit was crossed', () => {
   const msg = testMessage({ GBP: { price: 8.958 }, USD: { price: 6.69 } }, limits({ floor: 8.9, ceiling: 9.1 }));
-  assert.match(msg, /\nGBP 8\.9580 · below 8\.9000 or above 9\.1000\n/);
-  assert.match(msg, /\nUSD 6\.6900 · off\n/);
+  assert.match(msg, /^Test · notifications are working\nUSD 6\.6900 · off\nGBP 8\.9580 · below 8\.9000 or above 9\.1000$/);
   assert.doesNotMatch(msg, /EUR/); // not in the feed this time
   assert.doesNotMatch(msg, /your (floor|ceiling)/);
 });
@@ -194,10 +193,10 @@ test('failure and recovery messages say how long alerts were off', () => {
   assert.match(alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }, 'https://a.example'), /\nhttps:\/\/a\.example$/);
   assert.match(failingMessage({ count: 3, error: 'x' }, 'https://a.example'), /\nhttps:\/\/a\.example$/);
   const msg = failingMessage({ count: 3, error: 'CITIC returned 503' });
-  assert.match(msg, /failed 3 times in a row \(about 30 minutes\)/);
-  assert.match(msg, /alerts are paused/);
+  assert.match(msg, /^Price check failing · 3 in a row \(about 30 min\)\n/);
+  assert.match(msg, /\nAlerts paused · last error: /);
   assert.match(msg, /CITIC returned 503/);
-  assert.match(recoveredMessage({ count: 5 }), /after 5 failed checks \(about 50 minutes\)/);
+  assert.match(recoveredMessage({ count: 5 }), /^Price check working again · after 5 failures \(about 50 min\)\nAlerts back on$/);
 });
 
 test('a currency missing from one check keeps its alert state', () => {
@@ -214,8 +213,8 @@ test('yen is quoted and alerted per 100', () => {
     { quotePriceDate: '2026年11月03日', quotePriceTime: '21:00:00', curCode: '027001', cstexcBuyPrice: '4.1952', cstexcSellPrice: '4.2364' },
   ] } }) + ')';
   assert.equal(parseCitic(feed).JPY.price, 4.2364);
-  assert.match(alertMessage({ pair: 'JPY', side: 'floor', rate: 4.2, limit: 4.25 }), /100 JPY = 4\.2000 CNY/);
-  assert.match(alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }), /: 1 GBP = 8\.8000 CNY/);
+  assert.match(alertMessage({ pair: 'JPY', side: 'floor', rate: 4.2, limit: 4.25 }), /^100 JPY 4\.2000 · below floor 4\.2500\n/);
+  assert.match(alertMessage({ pair: 'GBP', side: 'floor', rate: 8.8, limit: 8.9 }), /^GBP 8\.8000 · below floor 8\.9000\n/);
 });
 
 test('past the limit, each deeper 0.2% step alerts once, straight away', () => {
@@ -231,7 +230,7 @@ test('past the limit, each deeper 0.2% step alerts once, straight away', () => {
   // Past 8.9221: the second step, without waiting for the 4-hour repeat.
   r = evaluate({ GBP: 8.922 }, l, r.alerted, r.sentAt, 2 * 3600_000, r.steps);
   assert.deepEqual(r.alerts.map(a => [a.step, a.further]), [[2, true]]);
-  assert.match(alertMessage(r.alerts[0]), /GBP fell further below your floor[\s\S]*Past step 2: 8\.9221 \(−0\.2%\)[\s\S]*Next alert below 8\.9042\./);
+  assert.match(alertMessage(r.alerts[0]), /^GBP 8\.9220 · past 8\.9221 \(floor −0\.2%\)\nNext alert below 8\.9042 · resets above 8\.9489$/);
   // The repeat clock restarts from that alert.
   assert.equal(evaluate({ GBP: 8.922 }, l, r.alerted, r.sentAt, 5.9 * 3600_000, r.steps).alerts.length, 0);
   assert.deepEqual(evaluate({ GBP: 8.922 }, l, r.alerted, r.sentAt, 6 * 3600_000, r.steps).alerts.map(a => [a.step, a.repeat]), [[2, true]]);
@@ -251,7 +250,7 @@ test('a ceiling steps up the same way', () => {
   assert.equal(r.alerts.length, 0);
   r = evaluate({ GBP: 9.0185 }, l, r.alerted, r.sentAt, 2, r.steps);
   assert.deepEqual(r.alerts.map(a => [a.step, a.further]), [[2, true]]);
-  assert.match(alertMessage(r.alerts[0]), /GBP rose further above your ceiling[\s\S]*\(\+0\.2%\)[\s\S]*Next alert above 9\.0360\./);
+  assert.match(alertMessage(r.alerts[0]), /^GBP 9\.0185 · past 9\.0180 \(ceiling \+0\.2%\)\nNext alert above 9\.0360 · resets below 8\.9910$/);
 });
 
 test('an alert state from before steps counts as the first step', () => {

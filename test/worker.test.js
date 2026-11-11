@@ -57,7 +57,7 @@ test('a check alerts once per crossing and records the quote once', async () => 
   const sent = network(() => citicFeed(8.91, 6.69));
   await run(e);
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /GBP is below your floor/);
+  assert.match(sent[0], /^GBP 8\.9100 · below floor 8\.9200\n/);
   assert.equal(store.json('data').alerted.GBP.floor, 8.92);
   const day = store.json('h:2026-10-27');
   assert.equal(day.rows.length, 1);
@@ -96,13 +96,13 @@ test('a check that keeps failing is reported once, and its recovery', async () =
   const sent = network(() => up ? citicFeed(8.95, 6.69) : null);
   for (let i = 0; i < 4; i++) assert.match((await run(e)).message, /CITIC returned 503/);
   assert.equal(sent.length, 1, 'one report, not one per failure');
-  assert.match(sent[0], /failed 3 times in a row/);
+  assert.match(sent[0], /^Price check failing · 3 in a row/);
   assert.equal(store.json('data').failing.count, 4);
 
   up = true;
   await run(e);
   assert.equal(sent.length, 2);
-  assert.match(sent[1], /working again after 4 failed checks/);
+  assert.match(sent[1], /^Price check working again · after 4 failures/);
   assert.equal(store.json('data').failing, undefined);
 });
 
@@ -258,7 +258,7 @@ test('a deeper step that Telegram fails to send is sent on the next check', asyn
   telegramUp = true;
   await run(e);
   assert.equal(sent.length, 2);
-  assert.match(sent[1], /GBP fell further below your floor[\s\S]*Past step 2: 8\.9022/);
+  assert.match(sent[1], /^GBP 8\.9000 · past 8\.9022 \(floor −0\.2%\)\n/);
   assert.equal(store.json('data').steps.GBP.floor, 2);
 });
 

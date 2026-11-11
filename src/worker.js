@@ -105,7 +105,7 @@ async function sendTelegram(env, text, silent = false) {
   const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, ...(silent && { disable_notification: true }) }),
+    body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, link_preview_options: { is_disabled: true }, ...(silent && { disable_notification: true }) }),
   });
   if (!res.ok) throw new Error(`Telegram returned ${res.status}`);
 }
